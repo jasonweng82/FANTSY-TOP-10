@@ -346,7 +346,7 @@ def main():
     season_data = get_league_players_season_stats(token)
 
     # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
-    debug_print_raw_stats(season_data, "Chris Sale")
+    debug_print_raw_stats(season_data, "Michael Wacha")
     debug_print_raw_stats(season_data, "Freddie Freeman")
 
     all_players = parse_players(season_data)
