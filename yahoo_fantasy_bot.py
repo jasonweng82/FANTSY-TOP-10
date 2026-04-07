@@ -347,7 +347,7 @@ def main():
 
     # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
     debug_print_raw_stats(season_data, "Chris Sale")
-    debug_print_raw_stats(season_data, "Jose Altuve")
+    debug_print_raw_stats(season_data, "Kyle Schwarber")
 
     all_players = parse_players(season_data)
     all_players.sort(key=lambda x: x["score"], reverse=True)
