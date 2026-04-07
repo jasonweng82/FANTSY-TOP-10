@@ -48,19 +48,18 @@ PITCHER_SCORING = {
 # Yahoo Fantasy stat ID mapping (MLB)
 # https://developer.yahoo.com/fantasysports/guide/
 BATTER_STAT_IDS = {
-    "R":    "12",
-    "H":    "8",   # total hits (for calculating 1B)
-    "1B":   "14",  # singles (Yahoo stat id)
-    "2B":   "9",
-    "3B":   "10",
-    "HR":   "11",
-    "RBI":  "13",
-    "SB":   "16",
-    "CS":   "17",
-    "BB":   "18",
-    "HBP":  "21",
-    "K":    "25",  # batter SO
-    "GIDP": "23",
+    "R":    "7",    # Runs           confirmed
+    "1B":   "9",    # Singles        confirmed (fixed from 14)
+    "2B":   "10",   # Doubles        confirmed (fixed from 9)
+    "3B":   "11",   # Triples        confirmed (fixed from 10)
+    "HR":   "12",   # Home Runs      confirmed (fixed from 11)
+    "RBI":  "13",   # RBI            confirmed
+    "SB":   "16",   # Stolen Bases   confirmed
+    "CS":   "17",   # Caught Stealing
+    "BB":   "18",   # Walks          confirmed
+    "HBP":  "20",   # Hit By Pitch   (guessed, was 21)
+    "K":    "21",   # Strikeouts     confirmed (fixed from 25)
+    "GIDP": "23",   # GIDP
 }
 
 PITCHER_STAT_IDS = {
