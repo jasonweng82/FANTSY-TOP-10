@@ -1,0 +1,48 @@
+name: Yahoo Fantasy MLB Daily Bot
+
+on:
+  schedule:
+    # 每天台灣時間早上 9:00 執行 (UTC+8 = UTC 01:00)
+    - cron: "0 1 * * *"
+  workflow_dispatch:  # 允許手動觸發測試
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      # 還原昨天的排名快取（從 artifact）
+      - name: Restore rank cache
+        uses: actions/cache@v4
+        with:
+          path: rank_cache.json
+          key: rank-cache-${{ github.run_id }}
+          restore-keys: |
+            rank-cache-
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run Fantasy Bot
+        env:
+          YAHOO_CLIENT_ID:      ${{ secrets.YAHOO_CLIENT_ID }}
+          YAHOO_CLIENT_SECRET:  ${{ secrets.YAHOO_CLIENT_SECRET }}
+          YAHOO_REFRESH_TOKEN:  ${{ secrets.YAHOO_REFRESH_TOKEN }}
+          YAHOO_LEAGUE_ID:      ${{ secrets.YAHOO_LEAGUE_ID }}
+          DISCORD_WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python yahoo_fantasy_bot.py
+
+      # 儲存新的排名快取供明天使用
+      - name: Save rank cache
+        uses: actions/cache/save@v4
+        with:
+          path: rank_cache.json
+          key: rank-cache-${{ github.run_id }}
