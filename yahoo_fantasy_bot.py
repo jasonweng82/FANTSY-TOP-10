@@ -324,8 +324,17 @@ def main():
     today_data = get_league_players_today_stats(token)
     today_players = parse_players(today_data)
     # 過濾今日有上場的球員（score != 0 或有任何非零 stat）
+    INVALID_VALUES = {"", "-", None, "-/-", "—", "N/A"}
+    def is_nonzero(v):
+        if v in INVALID_VALUES:
+            return False
+        try:
+            return float(v) != 0
+        except (ValueError, TypeError):
+            return False
+
     played_today = [p for p in today_players if p["score"] != 0 or any(
-        float(v) != 0 for v in p["stats"].values() if v not in ("", "-", None)
+        is_nonzero(v) for v in p["stats"].values()
     )]
     played_today.sort(key=lambda x: x["score"], reverse=True)
     today_top10 = played_today[:10]
