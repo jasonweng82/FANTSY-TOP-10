@@ -182,7 +182,6 @@ def parse_players(data: dict):
 
             # 判斷投手或打者
             pos_list = [x.get("display_position", "") for x in info if isinstance(x, dict) and "display_position" in x]
-            is_pitcher = any("P" in pos for pos in pos_list if pos not in ("SP", "RP") or True)
             # 更精確：看 eligible_positions
             elig = [x.get("eligible_positions", {}) for x in info if isinstance(x, dict)]
             pos_str = str(elig)
