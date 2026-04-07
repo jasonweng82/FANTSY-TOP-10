@@ -302,6 +302,36 @@ def send_discord(embeds: list):
 
 
 # ─────────────────────────────────────────────
+# DEBUG：印出原始 stat ID（確認對應正確後可刪除）
+# ─────────────────────────────────────────────
+def debug_print_raw_stats(data: dict, target_name: str = "Chris Sale"):
+    """印出指定球員的原始 stat ID 和數值，用來校正 stat ID 對應表"""
+    try:
+        league = data["fantasy_content"]["league"][1]
+        player_list = league["players"]
+        count = player_list["count"]
+        for i in range(count):
+            p = player_list[str(i)]["player"]
+            info = p[0]
+            name = info[2]["name"]["full"]
+            if target_name.lower() in name.lower():
+                stats_raw = p[1]["player_stats"]["stats"]
+                print(f"\n{'='*50}")
+                print(f"DEBUG 原始數據 - {name}")
+                print(f"{'='*50}")
+                for s in stats_raw:
+                    sid = s["stat"]["stat_id"]
+                    sval = s["stat"]["value"]
+                    if sval not in ("", "-", None, "0", 0):
+                        print(f"  stat_id={sid:>5}  value={sval}")
+                print(f"{'='*50}\n")
+                return
+        print(f"[DEBUG] 找不到球員: {target_name}")
+    except Exception as e:
+        print(f"[DEBUG ERROR] {e}")
+
+
+# ─────────────────────────────────────────────
 # 主流程
 # ─────────────────────────────────────────────
 def main():
@@ -315,6 +345,10 @@ def main():
     # 2. 本季累積數據
     print("抓取本季累積數據...")
     season_data = get_league_players_season_stats(token)
+
+    # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
+    debug_print_raw_stats(season_data, "Chris Sale")
+
     all_players = parse_players(season_data)
     all_players.sort(key=lambda x: x["score"], reverse=True)
     season_top10 = all_players[:10]
