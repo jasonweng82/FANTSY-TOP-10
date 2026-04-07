@@ -303,7 +303,7 @@ def send_discord(embeds: list):
 # ─────────────────────────────────────────────
 # DEBUG：印出原始 stat ID（確認對應正確後可刪除）
 # ─────────────────────────────────────────────
-def debug_print_raw_stats(data: dict, target_name: str = "Chris Sale"):
+def debug_print_raw_stats(data: dict, target_name: str = "Jose Altuve"):
     """印出指定球員的原始 stat ID 和數值，用來校正 stat ID 對應表"""
     try:
         league = data["fantasy_content"]["league"][1]
