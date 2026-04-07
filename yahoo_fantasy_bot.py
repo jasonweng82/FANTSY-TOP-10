@@ -59,7 +59,7 @@ BATTER_STAT_IDS = {
     "BB":   "18",   # Walks          confirmed
     "HBP":  "20",   # Hit By Pitch   (guessed, was 21)
     "K":    "21",   # Strikeouts     confirmed (fixed from 25)
-    "GIDP": "23",   # GIDP
+    "GIDP": "22",   # GIDP
 }
 
 PITCHER_STAT_IDS = {
