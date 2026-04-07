@@ -64,17 +64,17 @@ BATTER_STAT_IDS = {
 }
 
 PITCHER_STAT_IDS = {
-    "W":    "28",
-    "SV":   "32",
-    "OUT":  "48",  # Outs pitched (IP * 3)
-    "H":    "34",  # hits allowed
-    "ER":   "37",
-    "BB":   "35",
-    "HBP":  "39",
-    "K":    "36",  # pitcher SO
-    "HLD":  "33",
-    "QS":   "50",
-    "GIDP": "49",
+    "W":    "28",   # Wins          confirmed
+    "SV":   "32",   # Saves
+    "OUT":  "33",   # Outs pitched  confirmed (fixed from 48)
+    "H":    "34",   # Hits allowed  confirmed
+    "ER":   "37",   # Earned Runs   confirmed
+    "BB":   "46",   # Walks         confirmed (fixed from 35)
+    "HBP":  "39",   # Hit Batters   confirmed
+    "K":    "42",   # Strikeouts    confirmed (fixed from 36)
+    "HLD":  "41",   # Holds         (fixed from 33)
+    "QS":   "83",   # Quality Start confirmed (fixed from 50)
+    "GIDP": "49",   # GIDP
 }
 
 # ─────────────────────────────────────────────
