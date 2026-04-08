@@ -59,7 +59,7 @@ BATTER_STAT_IDS = {
     "BB":   "18",   # Walks          confirmed
     "HBP":  "20",   # Hit By Pitch   (guessed, was 21)
     "K":    "21",   # Strikeouts     confirmed (fixed from 25)
-    "GIDP": "22",   # GIDP
+    "GIDP": "23",   # GIDP
 }
 
 PITCHER_STAT_IDS = {
@@ -68,12 +68,12 @@ PITCHER_STAT_IDS = {
     "OUT":  "33",   # Outs pitched  confirmed (fixed from 48)
     "H":    "34",   # Hits allowed  confirmed
     "ER":   "37",   # Earned Runs   confirmed
-    "BB":   "39",   # Walks         confirmed (fixed from 35)
-    "HBP":  "41",   # Hit Batters   confirmed
+    "BB":   "46",   # Walks         confirmed (fixed from 35)
+    "HBP":  "39",   # Hit Batters   confirmed
     "K":    "42",   # Strikeouts    confirmed (fixed from 36)
-    "HLD":  "82",   # Holds         (fixed from 33)
+    "HLD":  "41",   # Holds         (fixed from 33)
     "QS":   "83",   # Quality Start confirmed (fixed from 50)
-    "GIDP": "46",   # GIDP
+    "GIDP": "49",   # GIDP
 }
 
 # ─────────────────────────────────────────────
@@ -123,7 +123,7 @@ def get_league_players_season_stats(token):
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     league_key = YAHOO_LEAGUE_ID
     url = (
-        f"{base}/league/{league_key}/players;status=T;count=200"
+        f"{base}/league/{league_key}/players;status=T;count=300"
         f"/stats;type=season?format=json"
     )
     return yahoo_get(url, token)
@@ -137,7 +137,7 @@ def get_league_players_today_stats(token):
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     league_key = YAHOO_LEAGUE_ID
     url = (
-        f"{base}/league/{league_key}/players;status=T;count=200"
+        f"{base}/league/{league_key}/players;status=T;count=300"
         f"/stats;type=date;date={today}?format=json"
     )
     return yahoo_get(url, token)
@@ -303,7 +303,7 @@ def send_discord(embeds: list):
 # ─────────────────────────────────────────────
 # DEBUG：印出原始 stat ID（確認對應正確後可刪除）
 # ─────────────────────────────────────────────
-def debug_print_raw_stats(data: dict, target_name: str = "Jose Altuve"):
+def debug_print_raw_stats(data: dict, target_name: str = "Chris Sale"):
     """印出指定球員的原始 stat ID 和數值，用來校正 stat ID 對應表"""
     try:
         league = data["fantasy_content"]["league"][1]
@@ -346,8 +346,8 @@ def main():
     season_data = get_league_players_season_stats(token)
 
     # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
-    debug_print_raw_stats(season_data, "Michael Wacha")
-    debug_print_raw_stats(season_data, "Freddie Freeman")
+    debug_print_raw_stats(season_data, "Chris Sale")
+    debug_print_raw_stats(season_data, "Christian Yelich")
 
     all_players = parse_players(season_data)
     all_players.sort(key=lambda x: x["score"], reverse=True)
