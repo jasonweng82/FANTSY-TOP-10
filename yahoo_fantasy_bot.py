@@ -115,32 +115,79 @@ def yahoo_get(url, token):
     return resp.json()
 
 
-def get_league_players_season_stats(token):
+def get_all_players_stats(token, stats_type: str, date_str: str = None):
     """
-    取得聯盟內所有球員的本季累積數據
-    使用 /league/{league_key}/players;status=T/stats;type=season
+    分頁抓取聯盟內所有球員數據（每次25筆，循環直到抓完）
+    stats_type: "season" 或 "date"
     """
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     league_key = YAHOO_LEAGUE_ID
-    url = (
-        f"{base}/league/{league_key}/players;status=T;count=300"
-        f"/stats;type=season?format=json"
-    )
-    return yahoo_get(url, token)
+    all_players = []
+    start = 0
+    page_size = 25
+
+    while True:
+        if stats_type == "season":
+            url = (
+                f"{base}/league/{league_key}/players;status=T"
+                f";start={start};count={page_size}"
+                f"/stats;type=season?format=json"
+            )
+        else:
+            url = (
+                f"{base}/league/{league_key}/players;status=T"
+                f";start={start};count={page_size}"
+                f"/stats;type=date;date={date_str}?format=json"
+            )
+
+        data = yahoo_get(url, token)
+        try:
+            league = data["fantasy_content"]["league"][1]
+            player_list = league["players"]
+            count = player_list.get("count", 0)
+        except Exception:
+            break
+
+        if count == 0:
+            break
+
+        # 合併到總列表（把這頁的 players 加進去）
+        for i in range(count):
+            all_players_entry = player_list.get(str(i))
+            if all_players_entry:
+                # 建立單頁格式的假 data 結構方便 parse_players 重用
+                all_players.append(all_players_entry)
+
+        print(f"  已抓取 {start + count} 位球員...")
+
+        if count < page_size:
+            break
+        start += page_size
+        time.sleep(0.5)  # 避免 API rate limit
+
+    # 包裝成 parse_players 可以讀的格式
+    players_dict = {str(i): all_players[i] for i in range(len(all_players))}
+    players_dict["count"] = len(all_players)
+    fake_data = {
+        "fantasy_content": {
+            "league": [
+                {},
+                {"players": players_dict}
+            ]
+        }
+    }
+    return fake_data
+
+
+def get_league_players_season_stats(token):
+    print("  分頁抓取本季累積數據...")
+    return get_all_players_stats(token, "season")
 
 
 def get_league_players_today_stats(token):
-    """
-    取得今日上場球員數據
-    """
     today = date.today().strftime("%Y-%m-%d")
-    base = "https://fantasysports.yahooapis.com/fantasy/v2"
-    league_key = YAHOO_LEAGUE_ID
-    url = (
-        f"{base}/league/{league_key}/players;status=T;count=300"
-        f"/stats;type=date;date={today}?format=json"
-    )
-    return yahoo_get(url, token)
+    print(f"  分頁抓取今日({today})數據...")
+    return get_all_players_stats(token, "date", today)
 
 
 # ─────────────────────────────────────────────
