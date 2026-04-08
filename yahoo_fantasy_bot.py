@@ -68,12 +68,12 @@ PITCHER_STAT_IDS = {
     "OUT":  "33",   # Outs pitched  confirmed (fixed from 48)
     "H":    "34",   # Hits allowed  confirmed
     "ER":   "37",   # Earned Runs   confirmed
-    "BB":   "46",   # Walks         confirmed (fixed from 35)
-    "HBP":  "39",   # Hit Batters   confirmed
+    "BB":   "39",   # Walks         confirmed (fixed from 35)
+    "HBP":  "41",   # Hit Batters   confirmed
     "K":    "42",   # Strikeouts    confirmed (fixed from 36)
-    "HLD":  "41",   # Holds         (fixed from 33)
+    "HLD":  "82",   # Holds         (fixed from 33)
     "QS":   "83",   # Quality Start confirmed (fixed from 50)
-    "GIDP": "49",   # GIDP
+    "GIDP": "46",   # GIDP
 }
 
 # ─────────────────────────────────────────────
