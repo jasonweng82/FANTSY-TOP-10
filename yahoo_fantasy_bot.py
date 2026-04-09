@@ -304,7 +304,7 @@ def build_discord_message(
         else:
             change_str = rank_arrow(prev - i)
         pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-        season_lines.append(f"`{i:>2}.` {pos} **{name}** ({p['team']})  `{score:.1f}pts`  {change_str}")
+        season_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{score:>6.1f}` {change_str}")
 
     embeds.append({
         "title": f"📊 本季累積得分 TOP 10　｜　{today_date}",
@@ -318,7 +318,7 @@ def build_discord_message(
         today_lines = []
         for i, p in enumerate(today_top10, 1):
             pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-            today_lines.append(f"`{i:>2}.` {pos} **{p['name']}** ({p['team']})  `{p['score']:+.1f}pts`")
+            today_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{p['score']:>+6.1f}`")
         embeds.append({
             "title": f"🔥 今日得分 TOP 10",
             "description": "\n".join(today_lines),
@@ -330,7 +330,7 @@ def build_discord_message(
         bottom_lines = []
         for i, p in enumerate(today_bottom5, 1):
             pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-            bottom_lines.append(f"`{i:>2}.` {pos} **{p['name']}** ({p['team']})  `{p['score']:+.1f}pts`")
+            bottom_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{p['score']:>+6.1f}`")
         embeds.append({
             "title": f"🥶 今日得分 BOTTOM 5（今日有上場）",
             "description": "\n".join(bottom_lines),
