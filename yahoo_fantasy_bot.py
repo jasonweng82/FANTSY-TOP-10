@@ -263,7 +263,7 @@ def parse_players(data: dict):
 
             score = calc_score(stats, is_pitcher)
             # DEBUG position (移除後請刪此行)
-            if name in ("Chris Sale", "Drake Baldwin"):
+            if name in ("Sandy Alcantara", "Drake Baldwin"):
                 print(f"[POS DEBUG] {name} | position='{position}' | info_keys={[list(x.keys()) if isinstance(x,dict) else x for x in info[:8]]}")
             players.append({
                 "name": name,
