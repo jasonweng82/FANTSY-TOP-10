@@ -211,7 +211,7 @@ def calc_score(stats: dict, is_pitcher: bool) -> float:
 
 
 def parse_players(data: dict):
-    """解析 Yahoo API 回傳，產生 [{name, team, is_pitcher, stats, score}]"""
+    """解析 Yahoo API 回傳，產生 [{name, team, position, is_pitcher, stats, score}]"""
     players = []
     try:
         league = data["fantasy_content"]["league"][1]
@@ -225,15 +225,34 @@ def parse_players(data: dict):
 
             # 基本資訊
             name = info[2]["name"]["full"]
-            team = info[6].get("editorial_team_abbr", "N/A")
 
-            # 判斷投手或打者
-            pos_list = [x.get("display_position", "") for x in info if isinstance(x, dict) and "display_position" in x]
-            is_pitcher = any("P" in pos for pos in pos_list if pos not in ("SP", "RP") or True)
-            # 更精確：看 eligible_positions
-            elig = [x.get("eligible_positions", {}) for x in info if isinstance(x, dict)]
-            pos_str = str(elig)
-            is_pitcher = "SP" in pos_str or "RP" in pos_str or "P" in pos_str
+            # 抓隊伍
+            team = "N/A"
+            for item in info:
+                if isinstance(item, dict) and "editorial_team_abbr" in item:
+                    team = item["editorial_team_abbr"]
+                    break
+
+            # 抓守位 display_position（例如 "SP", "2B", "OF"）
+            position = ""
+            for item in info:
+                if isinstance(item, dict):
+                    if "display_position" in item:
+                        position = item["display_position"]
+                        break
+                    # 有些版本放在 eligible_positions 裡
+                    if "eligible_positions" in item:
+                        ep = item["eligible_positions"]
+                        if isinstance(ep, dict):
+                            pos_list = [v for v in ep.values() if isinstance(v, dict)]
+                            positions = [p.get("position", "") for p in pos_list]
+                            position = ",".join(p for p in positions if p and p != "BN" and p != "DL" and p != "NA")
+                        break
+
+            # 判斷投手：SP, RP, P 都算投手
+            pitcher_positions = {"SP", "RP", "P"}
+            pos_set = set(position.replace(",", " ").split())
+            is_pitcher = bool(pos_set & pitcher_positions)
 
             # 整理 stats dict {stat_id: value}
             stats = {}
@@ -246,6 +265,7 @@ def parse_players(data: dict):
             players.append({
                 "name": name,
                 "team": team,
+                "position": position,   # 例如 "SP", "2B,OF", "C"
                 "is_pitcher": is_pitcher,
                 "score": score,
                 "stats": stats,
@@ -272,16 +292,23 @@ def save_ranks(ranks: dict):
 
 
 # ─────────────────────────────────────────────
-# Discord 訊息格式化
+# Discord 訊息格式化（手機優化版）
+# 每行格式：名字縮短到名+姓第一字，控制在25字內
 # ─────────────────────────────────────────────
 def rank_arrow(change: int) -> str:
     if change > 0:
-        return f"🟢 ▲{change}"
+        return f"▲{change}"
     elif change < 0:
-        return f"🔴 ▼{abs(change)}"
+        return f"▼{abs(change)}"
     else:
-        return "⚪ –"
+        return "–"
 
+def short_name(full_name: str) -> str:
+    """縮短名字：Shohei Ohtani → S.Ohtani"""
+    parts = full_name.strip().split()
+    if len(parts) >= 2:
+        return f"{parts[0][0]}.{parts[-1]}"
+    return full_name[:10]
 
 def build_discord_message(
     season_top10: list,
@@ -290,25 +317,33 @@ def build_discord_message(
     today_bottom5: list,
     today_date: str,
 ) -> list:
-    """回傳多個 Discord embed dict"""
+    """回傳多個 Discord embed dict（手機友善格式）"""
     embeds = []
 
     # ── Embed 1: 本季累積得分前10名 ──
+    # 格式：1. 🏏 S.Ohtani  129.2 🟢▲2
     season_lines = []
     for i, p in enumerate(season_top10, 1):
-        name = p["name"]
         score = p["score"]
-        prev = prev_ranks.get(name)
+        prev = prev_ranks.get(p["name"])
         if prev is None:
-            change_str = "🆕 新進榜"
+            change_str = "🆕"
         else:
-            change_str = rank_arrow(prev - i)
-        pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-        season_lines.append(f"`{i:>2}.` `{name:<14}` `{score:>6.1f}` **{pos}** {change_str}")
+            diff = prev - i
+            change_str = rank_arrow(diff)
+            if diff > 0:
+                change_str = f"🟢{change_str}"
+            elif diff < 0:
+                change_str = f"🔴{change_str}"
+            else:
+                change_str = "⚪–"
+        pos = p.get("position", "??") or "??"
+        season_lines.append(f"`{i:>2}.` `{p['name']:<20}` `{score:>6.1f}` **{pos}** {change_str}")
 
     embeds.append({
-        "title": f"📊 本季累積得分 TOP 10　｜　{today_date}",
-        "description": "\n".join(season_lines),
+        "title": f"📊 本季 TOP10 | {today_date}",
+        "description": "
+".join(season_lines),
         "color": 0x1E90FF,
         "footer": {"text": "Yahoo Fantasy MLB • 每日自動更新"},
     })
@@ -317,11 +352,12 @@ def build_discord_message(
     if today_top10:
         today_lines = []
         for i, p in enumerate(today_top10, 1):
-            pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-            today_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{p['score']:>+6.1f}`")
+            pos = p.get("position", "??") or "??"
+            today_lines.append(f"`{i:>2}.` `{p['name']:<20}` `{p['score']:>+6.1f}` **{pos}**")
         embeds.append({
-            "title": f"🔥 今日得分 TOP 10",
-            "description": "\n".join(today_lines),
+            "title": "🔥 今日得分 TOP10",
+            "description": "
+".join(today_lines),
             "color": 0xFFA500,
         })
 
@@ -329,11 +365,12 @@ def build_discord_message(
     if today_bottom5:
         bottom_lines = []
         for i, p in enumerate(today_bottom5, 1):
-            pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-            bottom_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{p['score']:>+6.1f}`")
+            pos = p.get("position", "??") or "??"
+            bottom_lines.append(f"`{i:>2}.` `{p['name']:<20}` `{p['score']:>+6.1f}` **{pos}**")
         embeds.append({
-            "title": f"🥶 今日得分 BOTTOM 5（今日有上場）",
-            "description": "\n".join(bottom_lines),
+            "title": "🥶 今日得分 BOTTOM5",
+            "description": "
+".join(bottom_lines),
             "color": 0xFF4444,
         })
 
@@ -394,7 +431,7 @@ def main():
 
     # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
     debug_print_raw_stats(season_data, "Chris Sale")
-    debug_print_raw_stats(season_data, "Drake Baldwin")
+    debug_print_raw_stats(season_data, "Christian Yelich")
 
     all_players = parse_players(season_data)
     all_players.sort(key=lambda x: x["score"], reverse=True)
