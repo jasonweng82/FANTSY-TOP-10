@@ -59,21 +59,21 @@ BATTER_STAT_IDS = {
     "BB":   "18",   # Walks          confirmed
     "HBP":  "20",   # Hit By Pitch   (guessed, was 21)
     "K":    "21",   # Strikeouts     confirmed (fixed from 25)
-    "GIDP": "22",   # GIDP
+    "GIDP": "22",   # GIDP confirmed (fixed from 23)
 }
 
 PITCHER_STAT_IDS = {
     "W":    "28",   # Wins          confirmed
     "SV":   "32",   # Saves
-    "OUT":  "33",   # Outs pitched  confirmed (fixed from 48)
+    "OUT":  "33",   # Outs pitched  confirmed 
     "H":    "34",   # Hits allowed  confirmed
     "ER":   "37",   # Earned Runs   confirmed
-    "BB":   "39",   # Walks         confirmed (fixed from 35)
+    "BB":   "39",   # Walks         confirmed 
     "HBP":  "41",   # Hit Batters   confirmed
-    "K":    "42",   # Strikeouts    confirmed (fixed from 36)
-    "HLD":  "82",   # Holds         (fixed from 33)
-    "QS":   "83",   # Quality Start confirmed (fixed from 50)
-    "GIDP": "46",   # GIDP
+    "K":    "42",   # Strikeouts    confirmed 
+    "HLD":  "82",   # Holds         confirmed 
+    "QS":   "83",   # Quality Start 
+    "GIDP": "46",   # GIDP confirmed
 }
 
 # ─────────────────────────────────────────────
@@ -262,6 +262,9 @@ def parse_players(data: dict):
                 stats[sid] = sval
 
             score = calc_score(stats, is_pitcher)
+            # DEBUG position (移除後請刪此行)
+            if name in ("Chris Sale", "Drake Baldwin"):
+                print(f"[POS DEBUG] {name} | position='{position}' | info_keys={[list(x.keys()) if isinstance(x,dict) else x for x in info[:8]]}")
             players.append({
                 "name": name,
                 "team": team,
@@ -429,9 +432,7 @@ def main():
     print("抓取本季累積數據...")
     season_data = get_league_players_season_stats(token)
 
-    # DEBUG: 印出 Chris Sale 原始 stat ID（確認對應後可刪除此行）
-    debug_print_raw_stats(season_data, "Chris Sale")
-    debug_print_raw_stats(season_data, "Christian Yelich")
+
 
     all_players = parse_players(season_data)
     all_players.sort(key=lambda x: x["score"], reverse=True)
