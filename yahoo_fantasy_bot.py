@@ -304,7 +304,7 @@ def build_discord_message(
         else:
             change_str = rank_arrow(prev - i)
         pos = "⚾ 投" if p["is_pitcher"] else "🏏 打"
-        season_lines.append(f"`{i:>2}.`{pos}`{name:<10}``{score:>6.1f}` {change_str}")
+        season_lines.append(f"`{i:>2}.` `{name:<14}` `{score:>6.1f}` **{pos}** {change_str}")
 
     embeds.append({
         "title": f"📊 本季累積得分 TOP 10　｜　{today_date}",
