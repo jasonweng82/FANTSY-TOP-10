@@ -1,9 +1,8 @@
 """
 Yahoo Fantasy MLB Bot
-- 每天抓取本季累積得分前10名球員
-- 比較與前一天排名變化
-- 今日上場球員得分最高前10名 & 最低5名
-- 推送到 Discord
+- 每天抓取本季累積得分前10名球員 + 今日得分 + Free Agent
+- 每週一推送週報
+- 產生圖卡發送到 Discord
 """
 
 import os
@@ -14,64 +13,28 @@ from datetime import date
 from pathlib import Path
 
 # ─────────────────────────────────────────────
-# 你的聯盟計分規則
+# 計分規則
 # ─────────────────────────────────────────────
 BATTER_SCORING = {
-    "R":    1.0,
-    "1B":   2.6,
-    "2B":   5.2,
-    "3B":   7.8,
-    "HR":  10.4,
-    "RBI":  1.0,
-    "SB":   3.5,
-    "CS":  -0.5,
-    "BB":   2.6,
-    "HBP":  2.6,
-    "K":   -0.5,
-    "GIDP":-1.0,
+    "R":    1.0,  "1B":   2.6,  "2B":   5.2,
+    "3B":   7.8,  "HR":  10.4,  "RBI":  1.0,
+    "SB":   3.5,  "CS":  -0.5,  "BB":   2.6,
+    "HBP":  2.6,  "K":   -0.5,  "GIDP":-1.0,
 }
-
 PITCHER_SCORING = {
-    "W":    3.0,
-    "SV":   6.0,
-    "OUT":  1.0,
-    "H":   -1.3,
-    "ER":  -2.5,
-    "BB":  -1.3,
-    "HBP": -1.3,
-    "K":    2.0,
-    "GIDP": 1.0,
-    "HLD":  5.0,
-    "QS":   6.0,
+    "W":    3.0,  "SV":   6.0,  "OUT":  1.0,
+    "H":   -1.3,  "ER":  -2.5,  "BB":  -1.3,
+    "HBP": -1.3,  "K":    2.0,  "GIDP": 1.0,
+    "HLD":  5.0,  "QS":   6.0,
 }
-
 BATTER_STAT_IDS = {
-    "R":    "7",
-    "1B":   "9",
-    "2B":   "10",
-    "3B":   "11",
-    "HR":   "12",
-    "RBI":  "13",
-    "SB":   "16",
-    "CS":   "17",
-    "BB":   "18",
-    "HBP":  "20",
-    "K":    "21",
-    "GIDP": "22",
+    "R":"7","1B":"9","2B":"10","3B":"11","HR":"12",
+    "RBI":"13","SB":"16","CS":"17","BB":"18",
+    "HBP":"20","K":"21","GIDP":"22",
 }
-
 PITCHER_STAT_IDS = {
-    "W":    "28",
-    "SV":   "32",
-    "OUT":  "33",
-    "H":    "34",
-    "ER":   "37",
-    "BB":   "39",
-    "HBP":  "41",
-    "K":    "42",
-    "HLD":  "82",
-    "QS":   "83",
-    "GIDP": "46",
+    "W":"28","SV":"32","OUT":"33","H":"34","ER":"37",
+    "BB":"39","HBP":"41","K":"42","HLD":"82","QS":"83","GIDP":"46",
 }
 
 # ─────────────────────────────────────────────
@@ -112,7 +75,6 @@ def fetch_all_players(token, stats_type, date_str=None):
     all_raw = []
     start = 0
     page_size = 25
-
     while True:
         if stats_type == "season":
             url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
@@ -122,28 +84,52 @@ def fetch_all_players(token, stats_type, date_str=None):
             url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
                    f";start={start};count={page_size}"
                    f"/stats;type=date;date={date_str}?format=json")
-
         data = yahoo_get(url, token)
         try:
             player_list = data["fantasy_content"]["league"][1]["players"]
             count = player_list.get("count", 0)
         except Exception:
             break
-
         if count == 0:
             break
-
         for i in range(count):
             entry = player_list.get(str(i))
             if entry:
                 all_raw.append(entry)
-
         print(f"  已抓取 {start + count} 位球員...")
         if count < page_size:
             break
         start += page_size
         time.sleep(0.5)
+    return all_raw
 
+def fetch_all_players_with_ownership(token):
+    """抓取球員含 ownership 資訊（判斷 FA）"""
+    base = "https://fantasysports.yahooapis.com/fantasy/v2"
+    all_raw = []
+    start = 0
+    page_size = 25
+    while True:
+        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=A"
+               f";start={start};count={page_size}"
+               f"/stats;type=season?format=json")
+        data = yahoo_get(url, token)
+        try:
+            player_list = data["fantasy_content"]["league"][1]["players"]
+            count = player_list.get("count", 0)
+        except Exception:
+            break
+        if count == 0:
+            break
+        for i in range(count):
+            entry = player_list.get(str(i))
+            if entry:
+                all_raw.append(entry)
+        print(f"  FA 已抓取 {start + count} 位...")
+        if count < page_size:
+            break
+        start += page_size
+        time.sleep(0.5)
     return all_raw
 
 # ─────────────────────────────────────────────
@@ -178,19 +164,13 @@ def parse_players(raw_list):
     players = []
     for entry in raw_list:
         try:
-            player   = entry["player"]
-            info     = player[0]
+            player    = entry["player"]
+            info      = player[0]
             stats_raw = player[1]["player_stats"]["stats"]
-
-            # 名字
-            name_obj = get_field(info, "name")
-            name = name_obj["full"] if name_obj else "Unknown"
-
-            # 隊伍
-            team = get_field(info, "editorial_team_abbr") or "N/A"
-
-            # 守位：先找 display_position
-            position = get_field(info, "display_position") or ""
+            name_obj  = get_field(info, "name")
+            name      = name_obj["full"] if name_obj else "Unknown"
+            team      = get_field(info, "editorial_team_abbr") or "N/A"
+            position  = get_field(info, "display_position") or ""
             if not position:
                 ep = get_field(info, "eligible_positions")
                 if isinstance(ep, dict):
@@ -198,24 +178,17 @@ def parse_players(raw_list):
                     for v in ep.values():
                         if isinstance(v, dict):
                             p = v.get("position", "")
-                            if p and p not in ("BN", "DL", "NA", "IL"):
+                            if p and p not in ("BN","DL","NA","IL"):
                                 pos_vals.append(p)
                     position = ",".join(pos_vals)
-
-            # 投打判斷
             pos_set    = set(position.replace(",", " ").split())
             is_pitcher = bool(pos_set & PITCHER_POS)
-
-            # Stats
-            stats = {s["stat"]["stat_id"]: s["stat"]["value"] for s in stats_raw}
-
+            stats      = {s["stat"]["stat_id"]: s["stat"]["value"] for s in stats_raw}
             players.append({
-                "name":       name,
-                "team":       team,
-                "position":   position,
+                "name": name, "team": team, "position": position,
                 "is_pitcher": is_pitcher,
-                "score":      calc_score(stats, is_pitcher),
-                "stats":      stats,
+                "score": calc_score(stats, is_pitcher),
+                "stats": stats,
             })
         except Exception as e:
             print(f"[WARN] parse error: {e}")
@@ -228,14 +201,12 @@ def played_today_filter(players):
     result = []
     for p in players:
         if p["score"] != 0:
-            result.append(p)
-            continue
+            result.append(p); continue
         for v in p["stats"].values():
             if v not in INVALID_STAT:
                 try:
                     if float(v) != 0:
-                        result.append(p)
-                        break
+                        result.append(p); break
                 except (ValueError, TypeError):
                     pass
     return result
@@ -254,101 +225,104 @@ def save_ranks(ranks):
         json.dump(ranks, f, ensure_ascii=False, indent=2)
 
 # ─────────────────────────────────────────────
-# Discord 格式
+# Discord 發送（只發圖片）
 # ─────────────────────────────────────────────
-def rank_arrow(diff):
-    if diff > 0: return f"🟢▲{diff}"
-    if diff < 0: return f"🔴▼{abs(diff)}"
-    return "⚪–"
-
-def fmt_line(i, name, score, pos, change=""):
-    pos_str = pos if pos else "??"
-    return f"`{i:>2}.` `{name:<18}` `{score:>7.1f}` **{pos_str}** {change}".rstrip()
-
-def build_discord_message(season_top10, prev_ranks, today_top10, today_bottom5, today_date):
-    embeds = []
-
-    # 本季 TOP10
-    lines = []
-    for i, p in enumerate(season_top10, 1):
-        prev   = prev_ranks.get(p["name"])
-        change = "🆕" if prev is None else rank_arrow(prev - i)
-        lines.append(fmt_line(i, p["name"], p["score"], p["position"], change))
-    embeds.append({
-        "title":       f"📊 本季 TOP10 ｜ {today_date}",
-        "description": "\n".join(lines),
-        "color":       0x1E90FF,
-        "footer":      {"text": "Yahoo Fantasy MLB • 每日自動更新"},
-    })
-
-    # 今日 TOP10
-    if today_top10:
-        lines = [fmt_line(i, p["name"], p["score"], p["position"])
-                 for i, p in enumerate(today_top10, 1)]
-        embeds.append({
-            "title":       "🔥 今日得分 TOP10",
-            "description": "\n".join(lines),
-            "color":       0xFFA500,
-        })
-
-    # 今日 BOTTOM5
-    if today_bottom5:
-        lines = [fmt_line(i, p["name"], p["score"], p["position"])
-                 for i, p in enumerate(today_bottom5, 1)]
-        embeds.append({
-            "title":       "🥶 今日得分 BOTTOM5",
-            "description": "\n".join(lines),
-            "color":       0xFF4444,
-        })
-
-    return embeds
-
-def send_discord(embeds):
-    resp = requests.post(DISCORD_WEBHOOK_URL, json={"embeds": embeds})
+def send_discord_image(image_bytes, filename="card.png", content=""):
+    resp = requests.post(
+        DISCORD_WEBHOOK_URL,
+        data={"content": content} if content else {},
+        files={"file": (filename, image_bytes, "image/png")},
+    )
     resp.raise_for_status()
-    print(f"[OK] Discord 推送成功 ({resp.status_code})")
+    print(f"[OK] Discord 圖片推送成功 ({resp.status_code}) - {filename}")
+    time.sleep(1)  # 避免 rate limit
 
 # ─────────────────────────────────────────────
 # 主流程
 # ─────────────────────────────────────────────
 def main():
-    today_str = date.today().strftime("%Y/%m/%d")
-    print(f"[{today_str}] 開始執行 Yahoo Fantasy MLB Bot...")
+    from image_generator import (
+        generate_season_top10, generate_today_top10,
+        generate_today_bottom5, generate_free_agent_top5,
+        generate_weekly_report,
+    )
+
+    today       = date.today()
+    today_str   = today.strftime("%Y/%m/%d")
+    is_monday   = today.weekday() == 0  # 週一
+    print(f"[{today_str}] 開始執行 Yahoo Fantasy MLB Bot... (週一={is_monday})")
 
     token = refresh_access_token()
     print("取得 Token 成功")
 
-    # 本季累積
+    # ── 本季累積 ──
     print("抓取本季累積數據...")
-    season_raw  = fetch_all_players(token, "season")
-    all_players = parse_players(season_raw)
+    season_raw   = fetch_all_players(token, "season")
+    all_players  = parse_players(season_raw)
     all_players.sort(key=lambda x: x["score"], reverse=True)
     season_top10 = all_players[:10]
 
-    # 印出前10名（確認守位）
     for i, p in enumerate(season_top10, 1):
         print(f"  {i:>2}. {p['name']:<22} {p['score']:>7.1f}  pos='{p['position']}'")
 
-    # 今日數據
+    # ── Free Agent ──
+    print("抓取 Free Agent 數據...")
+    rostered_names = {p["name"] for p in all_players if p["score"] > 0}
+    # 用 status=A (available) 過濾 FA
+    fa_raw     = fetch_all_players_with_ownership(token)
+    fa_players = parse_players(fa_raw)
+    # 只保留分數大於 0 且不在 rostered 裡的球員
+    fa_list    = [p for p in fa_players if p["name"] not in rostered_names and p["score"] > 0]
+    fa_list.sort(key=lambda x: x["score"], reverse=True)
+    fa_top5    = fa_list[:5]
+
+    # ── 今日數據 ──
     print("抓取今日數據...")
-    today_raw    = fetch_all_players(token, "date", date.today().strftime("%Y-%m-%d"))
+    today_raw     = fetch_all_players(token, "date", today.strftime("%Y-%m-%d"))
     today_players = parse_players(today_raw)
-    played       = played_today_filter(today_players)
+    played        = played_today_filter(today_players)
     played.sort(key=lambda x: x["score"], reverse=True)
     today_top10   = played[:10]
     today_bottom5 = sorted(played, key=lambda x: x["score"])[:5]
 
-    # 排名比較
+    # ── 排名快取 ──
     prev_ranks = load_prev_ranks()
     new_ranks  = {p["name"]: i + 1 for i, p in enumerate(season_top10)}
 
-    # Discord
-    print("推送到 Discord...")
-    embeds = build_discord_message(season_top10, prev_ranks, today_top10, today_bottom5, today_str)
-    send_discord(embeds)
+    # ── 產生圖卡並發送 ──
+    print("產生圖卡並推送到 Discord...")
+
+    # 1. 本季 TOP10
+    img = generate_season_top10(season_top10, prev_ranks, today_str)
+    send_discord_image(img, "season_top10.png")
+
+    # 2. 今日 TOP10（有上場才發）
+    if today_top10:
+        img = generate_today_top10(today_top10, today_str)
+        send_discord_image(img, "today_top10.png")
+
+    # 3. 今日 BOTTOM5（有上場才發）
+    if today_bottom5:
+        img = generate_today_bottom5(today_bottom5, today_str)
+        send_discord_image(img, "today_bottom5.png")
+
+    # 4. Free Agent TOP5（有資料才發）
+    if fa_top5:
+        img = generate_free_agent_top5(fa_top5, today_str)
+        send_discord_image(img, "free_agent_top5.png")
+
+    # 5. 週報（只有週一發）
+    if is_monday:
+        print("今天是週一，產生週報...")
+        from datetime import timedelta
+        last_mon = today - timedelta(days=7)
+        last_sun = today - timedelta(days=1)
+        week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
+        img = generate_weekly_report(season_top10, week_label)
+        send_discord_image(img, "weekly_report.png")
 
     save_ranks(new_ranks)
-    print("完成！排名快取已更新。")
+    print("完成！")
 
 
 if __name__ == "__main__":
