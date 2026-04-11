@@ -136,6 +136,39 @@ def fetch_fa_players(token):
     return all_raw
 
 
+def fetch_fa_players_date(token, date_str):
+    """
+    抓取指定日期所有 FA 球員的當日成績
+    分頁抓取，不限筆數
+    """
+    base = "https://fantasysports.yahooapis.com/fantasy/v2"
+    all_raw = []
+    start = 0
+    page_size = 25
+    while True:
+        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=FA"
+               f";start={start};count={page_size}"
+               f"/stats;type=date;date={date_str}?format=json")
+        data = yahoo_get(url, token)
+        try:
+            player_list = data["fantasy_content"]["league"][1]["players"]
+            count = player_list.get("count", 0)
+        except Exception:
+            break
+        if count == 0:
+            break
+        for i in range(count):
+            entry = player_list.get(str(i))
+            if entry:
+                all_raw.append(entry)
+        if count < page_size:
+            break
+        start += page_size
+        time.sleep(0.3)
+    print(f"    {date_str} FA 抓取完畢，共 {len(all_raw)} 位")
+    return all_raw
+
+
 def fetch_all_players_with_ownership(token):
     """抓取球員含 ownership 資訊（判斷 FA）"""
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
@@ -377,24 +410,33 @@ def main():
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
     # ── Free Agent：all_players 裡不在 owner_map 的就是 FA ──
-    # 找出名字差異（模糊比對）
-    import difflib
-    owner_names = list(owner_map.keys())
-    fa_list_all = [p for p in all_players if p["name"] not in owner_map]
-    print(f"  all={len(all_players)}, rostered={len(owner_map)}, 未匹配={len(fa_list_all)}")
-    for p in fa_list_all:
-        # 找最接近的名字
-        close = difflib.get_close_matches(p["name"], owner_names, n=1, cutoff=0.6)
-        print(f"  未匹配: [{p['name']}] 最近似: {close}")
+    # ── Free Agent TOP5（近兩天成績）──
+    print("抓取 FA 近兩天成績...")
+    from datetime import timedelta
+    yesterday   = today - timedelta(days=1)
+    day_before  = today - timedelta(days=2)
 
-    # 用模糊比對建立更準確的 FA 判斷
-    rostered_names_lower = {n.lower().strip() for n in owner_map.keys()}
-    fa_list = [p for p in all_players
-               if p["name"].lower().strip() not in rostered_names_lower
-               and p["score"] > 0]
-    fa_list.sort(key=lambda x: x["score"], reverse=True)
+    # 抓兩天的 FA 數據並合計分數
+    fa_scores = {}   # {name: {info + score}}
+
+    for day in [yesterday, day_before]:
+        day_str = day.strftime("%Y-%m-%d")
+        raw = fetch_fa_players_date(token, day_str)
+        players_day = parse_players(raw)
+        for p in players_day:
+            if p["score"] == 0:
+                continue
+            if p["name"] not in fa_scores:
+                fa_scores[p["name"]] = {
+                    "name": p["name"], "team": p["team"],
+                    "position": p["position"], "is_pitcher": p["is_pitcher"],
+                    "owner": "Free Agent", "score": 0.0,
+                }
+            fa_scores[p["name"]]["score"] += p["score"]
+
+    fa_list = sorted(fa_scores.values(), key=lambda x: x["score"], reverse=True)
     fa_top5 = fa_list[:5]
-    print(f"  模糊比對後 FA={len(fa_list)}")
+    print(f"  近兩天有得分的 FA={len(fa_list)}")
     for p in fa_top5:
         print(f"    FA: {p['name']:<22} {p['score']:.1f}")
 
