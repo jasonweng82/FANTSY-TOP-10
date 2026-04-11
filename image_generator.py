@@ -60,7 +60,7 @@ def _header(d, fonts, title, subtitle, last_col="TREND", show_last=True):
     d.text((PAD_X, 24), title,    font=fonts["title"], fill=WHITE)
     d.text((PAD_X, 68), subtitle, font=fonts["sub"],   fill=DK_GRAY)
     d.line([(PAD_X, 106), (W-PAD_X, 106)], fill=DIVIDER, width=2)
-    cols = [(PAD_X, "#"), (78, "PLAYER / OWNER"), (590, "POS"), (690, "PTS")]
+    cols = [(PAD_X, "#"), (78, "PLAYER / OWNER"), (570, "POS"), (670, "PTS")]
     if show_last:
         cols.append((810, last_col))
     for x, label in cols:
@@ -94,17 +94,19 @@ def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col, sc
     d.rounded_rectangle([ox, oy, ox+ow, oy+22], radius=4, fill=owner_bg)
     d.text((ox+7, oy+3), owner_str, font=fonts["owner"], fill=owner_col)
 
-    # POS 徽章
-    ps   = (pos or "??")[:4]
-    d.rounded_rectangle([580, y+22, 674, y+56], radius=4, fill=BG_BADGE)
-    bbox = d.textbbox((0, 0), ps, font=fonts["pos"])
-    pw   = bbox[2] - bbox[0]
-    pcol = PURPLE if pos in ("SP","RP","P","SP,RP") else BLUE_LT
-    d.text((597 - pw//2, y+30), ps, font=fonts["pos"], fill=pcol)
+    # POS 徽章（動態寬度，最少 50px）
+    ps   = (pos or "??")[:5]
+    bbox_ps = d.textbbox((0, 0), ps, font=fonts["pos"])
+    pw   = bbox_ps[2] - bbox_ps[0]
+    badge_w = max(pw + 16, 50)
+    badge_x = 568
+    d.rounded_rectangle([badge_x, y+22, badge_x+badge_w, y+56], radius=4, fill=BG_BADGE)
+    pcol = PURPLE if any(p in pos for p in ("SP","RP")) else BLUE_LT
+    d.text((badge_x + badge_w//2 - pw//2, y+30), ps, font=fonts["pos"], fill=pcol)
 
-    # 分數（trend 為空時用 tcol 顯示分數顏色）
+    # 分數（固定在 POS 右邊固定位置，trend 為空時用 tcol）
     score_fill = tcol if not trend else WHITE
-    d.text((652, y+22), f"{score:.1f}", font=fonts["score"], fill=score_fill)
+    d.text((badge_x + badge_w + 14, y+22), f"{score:.1f}", font=fonts["score"], fill=score_fill)
 
     # 趨勢（可選）
     if trend:
