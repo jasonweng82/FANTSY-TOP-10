@@ -377,11 +377,24 @@ def main():
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
     # ── Free Agent：all_players 裡不在 owner_map 的就是 FA ──
-    fa_list = [p for p in all_players if p["name"] not in owner_map]
-    fa_list = [p for p in fa_list if p["score"] > 0]
+    # 找出名字差異（模糊比對）
+    import difflib
+    owner_names = list(owner_map.keys())
+    fa_list_all = [p for p in all_players if p["name"] not in owner_map]
+    print(f"  all={len(all_players)}, rostered={len(owner_map)}, 未匹配={len(fa_list_all)}")
+    for p in fa_list_all:
+        # 找最接近的名字
+        close = difflib.get_close_matches(p["name"], owner_names, n=1, cutoff=0.6)
+        print(f"  未匹配: [{p['name']}] 最近似: {close}")
+
+    # 用模糊比對建立更準確的 FA 判斷
+    rostered_names_lower = {n.lower().strip() for n in owner_map.keys()}
+    fa_list = [p for p in all_players
+               if p["name"].lower().strip() not in rostered_names_lower
+               and p["score"] > 0]
     fa_list.sort(key=lambda x: x["score"], reverse=True)
     fa_top5 = fa_list[:5]
-    print(f"  all={len(all_players)}, rostered={len(owner_map)}, FA={len(fa_list)}")
+    print(f"  模糊比對後 FA={len(fa_list)}")
     for p in fa_top5:
         print(f"    FA: {p['name']:<22} {p['score']:.1f}")
 
