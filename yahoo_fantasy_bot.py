@@ -440,17 +440,34 @@ def main():
     for p in fa_top5:
         print(f"    FA: {p['name']:<22} {p['score']:.1f}")
 
-    # ── 今日數據 ──
-    print("抓取今日數據...")
-    today_raw     = fetch_all_players(token, "date", today.strftime("%Y-%m-%d"))
-    today_players = parse_players(today_raw)
-    # 把 owner 加到今日球員
-    for p in today_players:
-        p["owner"] = owner_map.get(p["name"], "Free Agent")
-    played        = played_today_filter(today_players)
-    played.sort(key=lambda x: x["score"], reverse=True)
+    # ── 近兩天累積數據 ──
+    print("抓取近兩天數據...")
+    from datetime import timedelta
+    two_day_scores = {}  # {name: {info + score}}
+
+    for day in [today - timedelta(days=1), today - timedelta(days=2)]:
+        day_str = day.strftime("%Y-%m-%d")
+        raw = fetch_all_players(token, "date", day_str)
+        players_day = parse_players(raw)
+        for p in players_day:
+            if p["score"] == 0:
+                continue
+            if p["name"] not in two_day_scores:
+                two_day_scores[p["name"]] = {
+                    "name":       p["name"],
+                    "team":       p["team"],
+                    "position":   p["position"],
+                    "is_pitcher": p["is_pitcher"],
+                    "owner":      owner_map.get(p["name"], "Free Agent"),
+                    "score":      0.0,
+                }
+            two_day_scores[p["name"]]["score"] += p["score"]
+        print(f"  {day_str} 抓取完畢")
+
+    played = sorted(two_day_scores.values(), key=lambda x: x["score"], reverse=True)
     today_top10   = played[:10]
-    today_bottom5 = sorted(played, key=lambda x: x["score"])[:5]
+    today_bottom5 = sorted(two_day_scores.values(), key=lambda x: x["score"])[:5]
+    print(f"  近兩天有得分球員共 {len(played)} 位")
 
     # ── 排名快取 ──
     prev_ranks = load_prev_ranks()
