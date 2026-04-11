@@ -143,26 +143,26 @@ def generate_season_top10(players, prev_ranks, today_str) -> bytes:
 def generate_today_top10(players, today_str) -> bytes:
     fonts = _fonts()
     img, d = _canvas(len(players))
-    _header(d, fonts, "今日得分 TOP 10", f"{today_str}  ·  Yahoo Fantasy MLB")
+    _header(d, fonts, "近兩天得分 TOP 10", f"{today_str}  ·  Yahoo Fantasy MLB")
     for i, p in enumerate(players, 1):
         sc = p["score"]
         tr = f"+{sc:.1f}" if sc >= 0 else f"{sc:.1f}"
         tc = GREEN if sc > 0 else (RED if sc < 0 else GRAY)
         _row(d, fonts, i, p["name"], p["team"], p["position"],
              p.get("owner", ""), sc, tr, tc, _bar(p["position"]))
-    _footer(d, fonts, len(players), "今日得分排行")
+    _footer(d, fonts, len(players), "近兩天累積得分排行")
     return _to_bytes(img)
 
 
 def generate_today_bottom5(players, today_str) -> bytes:
     fonts = _fonts()
     img, d = _canvas(len(players))
-    _header(d, fonts, "今日得分 BOTTOM 5", f"{today_str}  ·  Yahoo Fantasy MLB")
+    _header(d, fonts, "近兩天得分 BOTTOM 5", f"{today_str}  ·  Yahoo Fantasy MLB")
     for i, p in enumerate(players, 1):
         sc = p["score"]
         _row(d, fonts, i, p["name"], p["team"], p["position"],
              p.get("owner", ""), sc, f"{sc:.1f}", RED, _bar(p["position"]))
-    _footer(d, fonts, len(players), "今日得分墊底")
+    _footer(d, fonts, len(players), "近兩天累積得分墊底")
     return _to_bytes(img)
 
 
