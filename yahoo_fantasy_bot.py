@@ -132,6 +132,76 @@ def fetch_all_players_with_ownership(token):
         time.sleep(0.5)
     return all_raw
 
+
+def fetch_player_owner_map(token) -> dict:
+    """
+    回傳 {球員名字: 隊伍名稱} 的對應表
+    透過抓每支隊伍的 roster 來建立
+    """
+    base = "https://fantasysports.yahooapis.com/fantasy/v2"
+    owner_map = {}
+
+    # 先取得所有隊伍
+    teams_url = f"{base}/league/{YAHOO_LEAGUE_ID}/teams?format=json"
+    data = yahoo_get(teams_url, token)
+    try:
+        teams_raw = data["fantasy_content"]["league"][1]["teams"]
+        team_count = teams_raw["count"]
+    except Exception as e:
+        print(f"[WARN] 無法取得隊伍列表: {e}")
+        return owner_map
+
+    print(f"  共 {team_count} 支隊伍，抓取各隊 roster...")
+
+    for i in range(team_count):
+        try:
+            team_data  = teams_raw[str(i)]["team"]
+            team_info  = team_data[0]
+            # 取隊伍名稱
+            team_name  = ""
+            for item in team_info:
+                if isinstance(item, dict) and "name" in item:
+                    team_name = item["name"]
+                    break
+
+            # 取 team_key
+            team_key = ""
+            for item in team_info:
+                if isinstance(item, dict) and "team_key" in item:
+                    team_key = item["team_key"]
+                    break
+
+            if not team_key:
+                continue
+
+            # 抓該隊 roster
+            roster_url = f"{base}/team/{team_key}/roster?format=json"
+            rdata = yahoo_get(roster_url, token)
+            players_raw = rdata["fantasy_content"]["team"][1]["roster"]["0"]["players"]
+            p_count = players_raw["count"]
+
+            for j in range(p_count):
+                try:
+                    pinfo = players_raw[str(j)]["player"][0]
+                    name_obj = None
+                    for item in pinfo:
+                        if isinstance(item, dict) and "name" in item:
+                            name_obj = item["name"]
+                            break
+                    if name_obj:
+                        owner_map[name_obj["full"]] = team_name
+                except Exception:
+                    pass
+
+            print(f"    {team_name}: {p_count} 位球員")
+            time.sleep(0.3)
+
+        except Exception as e:
+            print(f"[WARN] 隊伍 {i} roster 抓取失敗: {e}")
+
+    print(f"  owner_map 建立完成，共 {len(owner_map)} 位球員")
+    return owner_map
+
 # ─────────────────────────────────────────────
 # 計分
 # ─────────────────────────────────────────────
@@ -264,6 +334,14 @@ def main():
 
     for i, p in enumerate(season_top10, 1):
         print(f"  {i:>2}. {p['name']:<22} {p['score']:>7.1f}  pos='{p['position']}'")
+
+    # ── 抓各隊 Roster Owner Map ──
+    print("抓取各隊 roster 對應表...")
+    owner_map = fetch_player_owner_map(token)
+
+    # 把 owner 資訊加到每個球員
+    for p in all_players:
+        p["owner"] = owner_map.get(p["name"], "Free Agent")
 
     # ── Free Agent ──
     print("抓取 Free Agent 數據...")
