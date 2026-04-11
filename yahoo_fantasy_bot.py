@@ -343,11 +343,14 @@ def main():
     for p in all_players:
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
-    # ── Free Agent：從已抓球員中過濾 owner == "Free Agent" ──
-    fa_list = [p for p in all_players if p.get("owner") == "Free Agent" and p["score"] > 0]
+    # ── Free Agent：不在 owner_map 裡的就是 FA ──
+    rostered_names = set(owner_map.keys())
+    fa_list = [p for p in all_players if p["name"] not in rostered_names and p["score"] > 0]
     fa_list.sort(key=lambda x: x["score"], reverse=True)
     fa_top5 = fa_list[:5]
-    print(f"  找到 {len(fa_list)} 位 Free Agent，取前5")
+    print(f"  rostered={len(rostered_names)}, 找到 {len(fa_list)} 位 Free Agent，取前5")
+    for p in fa_top5:
+        print(f"    FA: {p['name']} {p['score']:.1f}")
 
     # ── 今日數據 ──
     print("抓取今日數據...")
