@@ -278,7 +278,16 @@ def fetch_player_owner_map(token) -> dict:
                             name_obj = item["name"]
                             break
                     if name_obj:
-                        owner_map[name_obj["full"]] = team_name
+                        full_name = name_obj["full"]
+                        # 取該球員的 MLB 隊伍縮寫
+                        mlb_team = ""
+                        for itm in pinfo:
+                            if isinstance(itm, dict) and "editorial_team_abbr" in itm:
+                                mlb_team = itm["editorial_team_abbr"]
+                                break
+                        # 用 name+team 當 key 避免同名問題
+                        owner_map[full_name] = team_name
+                        owner_map[f"{full_name}|{mlb_team}"] = team_name
                 except Exception:
                     pass
 
@@ -430,7 +439,8 @@ def main():
 
     # 把 owner 資訊加到每個球員
     for p in all_players:
-        p["owner"] = owner_map.get(p["name"], "Free Agent")
+        key = f"{p['name']}|{p['team']}"
+        p["owner"] = owner_map.get(key) or owner_map.get(p["name"], "Free Agent")
 
     # ── Free Agent：all_players 裡不在 owner_map 的就是 FA ──
     # ── Free Agent TOP5（近兩天成績）──
@@ -484,7 +494,7 @@ def main():
                     "team":       p["team"],
                     "position":   p["position"],
                     "is_pitcher": p["is_pitcher"],
-                    "owner":      owner_map.get(name, "Free Agent"),
+                    "owner":      owner_map.get(f"{name}|{p['team']}") or owner_map.get(name, "Free Agent"),
                     "score":      0.0,
                 }
                 two_day_opps[name] = []
