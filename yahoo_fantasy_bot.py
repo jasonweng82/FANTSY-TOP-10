@@ -376,18 +376,8 @@ def main():
     for p in all_players:
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
-    # ── Free Agent：用 status=FA 直接抓聯盟內 FA ──
-    print("抓取 Free Agent 數據...")
-    fa_raw  = fetch_fa_players(token)
-    fa_list = parse_players(fa_raw)
-    for p in fa_list:
-        p["owner"] = "Free Agent"
-    fa_list = [p for p in fa_list if p["score"] > 0]
-    fa_list.sort(key=lambda x: x["score"], reverse=True)
-    fa_top5 = fa_list[:5]
-    print(f"  找到 {len(fa_list)} 位 FA，取前5")
-    for p in fa_top5:
-        print(f"    FA: {p['name']} {p['score']:.1f}")
+    # ── Free Agent 暫時停用 ──
+    fa_top5 = []
 
     # ── 今日數據 ──
     print("抓取今日數據...")
