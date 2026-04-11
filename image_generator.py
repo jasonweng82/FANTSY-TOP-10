@@ -55,15 +55,18 @@ def _canvas(n_rows):
     img = Image.new("RGB", (W, H), BG_DARK)
     return img, ImageDraw.Draw(img)
 
-def _header(d, fonts, title, subtitle, last_col="TREND"):
+def _header(d, fonts, title, subtitle, last_col="TREND", show_last=True):
     d.rectangle([0, 0, W, 8], fill=BLUE_BAR)
     d.text((PAD_X, 24), title,    font=fonts["title"], fill=WHITE)
     d.text((PAD_X, 68), subtitle, font=fonts["sub"],   fill=DK_GRAY)
     d.line([(PAD_X, 106), (W-PAD_X, 106)], fill=DIVIDER, width=2)
-    for x, label in [(PAD_X, "#"), (78, "PLAYER / OWNER"), (590, "POS"), (690, "PTS"), (810, last_col)]:
+    cols = [(PAD_X, "#"), (78, "PLAYER / OWNER"), (590, "POS"), (690, "PTS")]
+    if show_last:
+        cols.append((810, last_col))
+    for x, label in cols:
         d.text((x, 118), label, font=fonts["detail"], fill=DK_GRAY)
 
-def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col):
+def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col, score_col=WHITE):
     y  = Y_HEADER + (rank - 1) * ROW_H
     bg = BG_ROW1 if rank == 1 else BG_ROW2
     d.rounded_rectangle([18, y, W-18, y+ROW_H-6], radius=8, fill=bg)
@@ -99,11 +102,13 @@ def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col):
     pcol = PURPLE if pos in ("SP","RP","P","SP,RP") else BLUE_LT
     d.text((597 - pw//2, y+30), ps, font=fonts["pos"], fill=pcol)
 
-    # 分數
-    d.text((652, y+22), f"{score:.1f}", font=fonts["score"], fill=WHITE)
+    # 分數（trend 為空時用 tcol 顯示分數顏色）
+    score_fill = tcol if not trend else WHITE
+    d.text((652, y+22), f"{score:.1f}", font=fonts["score"], fill=score_fill)
 
-    # 趨勢
-    d.text((810, y+26), trend, font=fonts["opp"],   fill=tcol)
+    # 趨勢（可選）
+    if trend:
+        d.text((810, y+26), trend, font=fonts["opp"], fill=tcol)
 
 def _footer(d, fonts, n_rows, label="Yahoo Fantasy MLB Bot"):
     y = Y_HEADER + n_rows * ROW_H + 10
@@ -144,13 +149,11 @@ def generate_season_top10(players, prev_ranks, today_str) -> bytes:
 def generate_today_top10(players, today_str) -> bytes:
     fonts = _fonts()
     img, d = _canvas(len(players))
-    _header(d, fonts, "近兩天得分 TOP 10", f"{today_str}  ·  Yahoo Fantasy MLB", last_col="OPP")
+    _header(d, fonts, "近兩天得分 TOP 10", f"{today_str}  ·  Yahoo Fantasy MLB", show_last=False)
     for i, p in enumerate(players, 1):
-        sc  = p["score"]
-        opp = p.get("opponent", "")
-        tc  = BLUE_LT if opp else GRAY
+        sc = p["score"]
         _row(d, fonts, i, p["name"], p["team"], p["position"],
-             p.get("owner", ""), sc, opp, tc, _bar(p["position"]))
+             p.get("owner", ""), sc, "", GREEN, _bar(p["position"]))
     _footer(d, fonts, len(players), "近兩天累積得分排行")
     return _to_bytes(img)
 
@@ -158,12 +161,12 @@ def generate_today_top10(players, today_str) -> bytes:
 def generate_today_bottom5(players, today_str) -> bytes:
     fonts = _fonts()
     img, d = _canvas(len(players))
-    _header(d, fonts, "近兩天得分 BOTTOM 5", f"{today_str}  ·  Yahoo Fantasy MLB", last_col="OPP")
+    _header(d, fonts, "近兩天得分 BOTTOM 5", f"{today_str}  ·  Yahoo Fantasy MLB", show_last=False)
     for i, p in enumerate(players, 1):
-        sc  = p["score"]
-        opp = p.get("opponent", "")
+        sc = p["score"]
+        # trend 傳空字串 → 分數欄自動變紅色，不顯示 OPP
         _row(d, fonts, i, p["name"], p["team"], p["position"],
-             p.get("owner", ""), sc, opp, RED, _bar(p["position"]))
+             p.get("owner", ""), sc, "", RED, _bar(p["position"]))
     _footer(d, fonts, len(players), "近兩天累積得分墊底")
     return _to_bytes(img)
 
