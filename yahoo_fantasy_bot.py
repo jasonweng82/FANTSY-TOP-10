@@ -343,21 +343,19 @@ def main():
     for p in all_players:
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
-    # ── Free Agent ──
-    print("抓取 Free Agent 數據...")
-    rostered_names = {p["name"] for p in all_players if p["score"] > 0}
-    # 用 status=A (available) 過濾 FA
-    fa_raw     = fetch_all_players_with_ownership(token)
-    fa_players = parse_players(fa_raw)
-    # 只保留分數大於 0 且不在 rostered 裡的球員
-    fa_list    = [p for p in fa_players if p["name"] not in rostered_names and p["score"] > 0]
+    # ── Free Agent：從已抓球員中過濾 owner == "Free Agent" ──
+    fa_list = [p for p in all_players if p.get("owner") == "Free Agent" and p["score"] > 0]
     fa_list.sort(key=lambda x: x["score"], reverse=True)
-    fa_top5    = fa_list[:5]
+    fa_top5 = fa_list[:5]
+    print(f"  找到 {len(fa_list)} 位 Free Agent，取前5")
 
     # ── 今日數據 ──
     print("抓取今日數據...")
     today_raw     = fetch_all_players(token, "date", today.strftime("%Y-%m-%d"))
     today_players = parse_players(today_raw)
+    # 把 owner 加到今日球員
+    for p in today_players:
+        p["owner"] = owner_map.get(p["name"], "Free Agent")
     played        = played_today_filter(today_players)
     played.sort(key=lambda x: x["score"], reverse=True)
     today_top10   = played[:10]
