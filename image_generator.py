@@ -169,7 +169,7 @@ def generate_today_bottom5(players, today_str) -> bytes:
 def generate_free_agent_top5(players, today_str) -> bytes:
     fonts = _fonts()
     img, d = _canvas(len(players))
-    _header(d, fonts, "本季 Free Agent TOP 5", f"{today_str}  ·  強烈推薦撿人")
+    _header(d, fonts, "FA 近兩天得分 TOP 5", f"{today_str}  ·  強烈推薦撿人")
     for i, p in enumerate(players, 1):
         _row(d, fonts, i, p["name"], p["team"], p["position"],
              "Free Agent", p["score"], "FA", NEW_BLUE, _bar(p["position"]))
