@@ -376,8 +376,14 @@ def main():
     for p in all_players:
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
-    # ── Free Agent 暫時停用 ──
-    fa_top5 = []
+    # ── Free Agent：all_players 裡不在 owner_map 的就是 FA ──
+    fa_list = [p for p in all_players if p["name"] not in owner_map]
+    fa_list = [p for p in fa_list if p["score"] > 0]
+    fa_list.sort(key=lambda x: x["score"], reverse=True)
+    fa_top5 = fa_list[:5]
+    print(f"  all={len(all_players)}, rostered={len(owner_map)}, FA={len(fa_list)}")
+    for p in fa_top5:
+        print(f"    FA: {p['name']:<22} {p['score']:.1f}")
 
     # ── 今日數據 ──
     print("抓取今日數據...")
