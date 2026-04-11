@@ -136,6 +136,29 @@ def fetch_fa_players(token):
     return all_raw
 
 
+def fetch_schedule(date_str) -> dict:
+    """
+    抓取指定日期 MLB 賽程
+    回傳 {隊伍縮寫: 對手縮寫}，例如 {"HOU": "LAD", "LAD": "HOU"}
+    """
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={date_str}"
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        matchups = {}
+        for game in data.get("dates", [{}])[0].get("games", []):
+            away = game["teams"]["away"]["team"].get("abbreviation", "")
+            home = game["teams"]["home"]["team"].get("abbreviation", "")
+            if away and home:
+                matchups[away] = f"vs {home}"
+                matchups[home] = f"vs {away}"
+        return matchups
+    except Exception as e:
+        print(f"[WARN] 賽程抓取失敗 {date_str}: {e}")
+        return {}
+
+
 def fetch_fa_players_date(token, date_str):
     """
     抓取指定日期所有 FA 球員的當日成績
@@ -443,26 +466,38 @@ def main():
     # ── 近兩天累積數據 ──
     print("抓取近兩天數據...")
     from datetime import timedelta
-    two_day_scores = {}  # {name: {info + score}}
+    two_day_scores = {}   # {name: {info + score}}
+    two_day_opps   = {}   # {name: [對手1, 對手2]}
 
     for day in [today - timedelta(days=1), today - timedelta(days=2)]:
-        day_str = day.strftime("%Y-%m-%d")
+        day_str  = day.strftime("%Y-%m-%d")
+        schedule = fetch_schedule(day_str)   # {team: "vs OPP"}
         raw = fetch_all_players(token, "date", day_str)
         players_day = parse_players(raw)
         for p in players_day:
             if p["score"] == 0:
                 continue
-            if p["name"] not in two_day_scores:
-                two_day_scores[p["name"]] = {
-                    "name":       p["name"],
+            name = p["name"]
+            if name not in two_day_scores:
+                two_day_scores[name] = {
+                    "name":       name,
                     "team":       p["team"],
                     "position":   p["position"],
                     "is_pitcher": p["is_pitcher"],
-                    "owner":      owner_map.get(p["name"], "Free Agent"),
+                    "owner":      owner_map.get(name, "Free Agent"),
                     "score":      0.0,
                 }
-            two_day_scores[p["name"]]["score"] += p["score"]
+                two_day_opps[name] = []
+            two_day_scores[name]["score"] += p["score"]
+            opp = schedule.get(p["team"], "")
+            if opp and opp not in two_day_opps[name]:
+                two_day_opps[name].append(opp)
         print(f"  {day_str} 抓取完畢")
+
+    # 把對手資訊合併進去，格式：vs LAD · vs NYY
+    for name, p in two_day_scores.items():
+        opps = two_day_opps.get(name, [])
+        p["opponent"] = "  ·  ".join(opps) if opps else ""
 
     played = sorted(two_day_scores.values(), key=lambda x: x["score"], reverse=True)
     today_top10   = played[:10]
