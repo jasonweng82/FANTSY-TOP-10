@@ -103,6 +103,39 @@ def fetch_all_players(token, stats_type, date_str=None):
         time.sleep(0.5)
     return all_raw
 
+def fetch_fa_players(token):
+    """
+    抓取聯盟內的 Free Agent 球員（status=FA）
+    只會回傳本聯盟 waivers/FA 的球員，不會抓全MLB
+    """
+    base = "https://fantasysports.yahooapis.com/fantasy/v2"
+    all_raw = []
+    start = 0
+    page_size = 25
+    while True:
+        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=FA"
+               f";start={start};count={page_size}"
+               f"/stats;type=season?format=json")
+        data = yahoo_get(url, token)
+        try:
+            player_list = data["fantasy_content"]["league"][1]["players"]
+            count = player_list.get("count", 0)
+        except Exception:
+            break
+        if count == 0:
+            break
+        for i in range(count):
+            entry = player_list.get(str(i))
+            if entry:
+                all_raw.append(entry)
+        print(f"  FA 已抓取 {start + count} 位...")
+        if count < page_size:
+            break
+        start += page_size
+        time.sleep(0.3)
+    return all_raw
+
+
 def fetch_all_players_with_ownership(token):
     """抓取球員含 ownership 資訊（判斷 FA）"""
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
@@ -343,12 +376,16 @@ def main():
     for p in all_players:
         p["owner"] = owner_map.get(p["name"], "Free Agent")
 
-    # ── Free Agent：不在 owner_map 裡的就是 FA ──
-    rostered_names = set(owner_map.keys())
-    fa_list = [p for p in all_players if p["name"] not in rostered_names and p["score"] > 0]
+    # ── Free Agent：用 status=FA 直接抓聯盟內 FA ──
+    print("抓取 Free Agent 數據...")
+    fa_raw  = fetch_fa_players(token)
+    fa_list = parse_players(fa_raw)
+    for p in fa_list:
+        p["owner"] = "Free Agent"
+    fa_list = [p for p in fa_list if p["score"] > 0]
     fa_list.sort(key=lambda x: x["score"], reverse=True)
     fa_top5 = fa_list[:5]
-    print(f"  rostered={len(rostered_names)}, 找到 {len(fa_list)} 位 Free Agent，取前5")
+    print(f"  找到 {len(fa_list)} 位 FA，取前5")
     for p in fa_top5:
         print(f"    FA: {p['name']} {p['score']:.1f}")
 
