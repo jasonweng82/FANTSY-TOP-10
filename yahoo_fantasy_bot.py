@@ -436,6 +436,8 @@ def generate_mvp_comment(mvp: dict, bottom: dict) -> str:
         return comment
     except Exception as e:
         print(f"[WARN] MVP 點評失敗: {e}")
+        import traceback
+        traceback.print_exc()
         return ""
 
 
