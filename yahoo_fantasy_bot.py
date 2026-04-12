@@ -593,6 +593,7 @@ def main():
         send_discord_image(img, "today_bottom5.png")
 
     # MVP 點評（今日有比賽才發）
+    print(f"  today_top10={len(today_top10)}, today_bottom5={len(today_bottom5)}")
     if today_top10 and today_bottom5:
         print("產生 MVP 點評...")
         comment = generate_mvp_comment(today_top10[0], today_bottom5[0])
