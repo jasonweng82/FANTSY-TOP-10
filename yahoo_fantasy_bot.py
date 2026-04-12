@@ -44,7 +44,8 @@ YAHOO_CLIENT_ID     = os.environ["YAHOO_CLIENT_ID"]
 YAHOO_CLIENT_SECRET = os.environ["YAHOO_CLIENT_SECRET"]
 YAHOO_REFRESH_TOKEN = os.environ["YAHOO_REFRESH_TOKEN"]
 YAHOO_LEAGUE_ID     = os.environ["YAHOO_LEAGUE_ID"]
-DISCORD_WEBHOOK_URL = os.environ["DISCORD_WEBHOOK_URL"]
+DISCORD_WEBHOOK_URL  = os.environ["DISCORD_WEBHOOK_URL"]
+ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
 RANK_CACHE_FILE     = "rank_cache.json"
 PITCHER_POS         = {"SP", "RP", "P"}
 INVALID_STAT        = {"", "-", None, "-/-", "—", "N/A", "0"}
@@ -393,6 +394,66 @@ def save_ranks(ranks):
         json.dump(ranks, f, ensure_ascii=False, indent=2)
 
 # ─────────────────────────────────────────────
+# MVP 點評（Claude API）
+# ─────────────────────────────────────────────
+def generate_mvp_comment(mvp: dict, bottom: dict) -> str:
+    """
+    呼叫 Claude API 產生今日 MVP 趣味點評
+    mvp:    近兩天得分最高的球員 dict
+    bottom: 近兩天得分最低的球員 dict
+    """
+    if not ANTHROPIC_API_KEY:
+        return ""
+
+    mvp_name    = mvp["name"]
+    mvp_score   = mvp["score"]
+    mvp_pos     = mvp["position"]
+    mvp_team    = mvp["team"]
+    mvp_owner   = mvp.get("owner", "某位玩家")
+    bot_name    = bottom["name"]
+    bot_score   = bottom["score"]
+    bot_owner   = bottom.get("owner", "某位玩家")
+
+    prompt = f"""你是一個 Yahoo Fantasy MLB 聯盟的趣味播報員，用繁體中文寫一段簡短點評（60字以內）。
+
+近兩天表現最佳球員：{mvp_name}（{mvp_pos}，{mvp_team}），得{mvp_score:.1f}分，屬於玩家「{mvp_owner}」
+近兩天表現最差球員：{bot_name}，得{bot_score:.1f}分，屬於玩家「{bot_owner}」
+
+請寫一段幽默、帶點嘲諷但不失禮的點評，可以稱讚MVP也可以酸一下墊底球員的主人。語氣輕鬆像朋友聊天。直接給點評內容，不要加任何前綴。"""
+
+    try:
+        resp = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 200,
+                "messages": [{"role": "user", "content": prompt}],
+            },
+            timeout=30,
+        )
+        resp.raise_for_status()
+        comment = resp.json()["content"][0]["text"].strip()
+        print(f"  MVP 點評: {comment}")
+        return comment
+    except Exception as e:
+        print(f"[WARN] MVP 點評失敗: {e}")
+        return ""
+
+
+def send_discord_text(text: str):
+    """發送純文字訊息到 Discord"""
+    resp = requests.post(DISCORD_WEBHOOK_URL, json={"content": text})
+    resp.raise_for_status()
+    print(f"[OK] Discord 文字推送成功 ({resp.status_code})")
+    time.sleep(1)
+
+
+# ─────────────────────────────────────────────
 # Discord 發送（只發圖片）
 # ─────────────────────────────────────────────
 def send_discord_image(image_bytes, filename="card.png", content=""):
@@ -534,6 +595,23 @@ def main():
     if today_bottom5:
         img = generate_today_bottom5(today_bottom5, today_str)
         send_discord_image(img, "today_bottom5.png")
+
+    # MVP 點評（今日有比賽才發）
+    if today_top10 and today_bottom5:
+        print("產生 MVP 點評...")
+        comment = generate_mvp_comment(today_top10[0], today_bottom5[0])
+        if comment:
+            mvp = today_top10[0]
+            loser = today_bottom5[0]
+            msg = (
+                f"🏆 **近兩天 MVP：{mvp['name']}**（{mvp['owner']}）`{mvp['score']:+.1f}pts`
+"
+                f"💀 **近兩天墊底：{loser['name']}**（{loser['owner']}）`{loser['score']:+.1f}pts`
+
+"
+                f"🤖 {comment}"
+            )
+            send_discord_text(msg)
 
     # 4. Free Agent TOP5（有資料才發）
     if fa_top5:
