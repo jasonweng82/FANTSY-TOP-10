@@ -45,7 +45,7 @@ YAHOO_CLIENT_SECRET = os.environ["YAHOO_CLIENT_SECRET"]
 YAHOO_REFRESH_TOKEN = os.environ["YAHOO_REFRESH_TOKEN"]
 YAHOO_LEAGUE_ID     = os.environ["YAHOO_LEAGUE_ID"]
 DISCORD_WEBHOOK_URL  = os.environ["DISCORD_WEBHOOK_URL"]
-ANTHROPIC_API_KEY    = os.environ.get("ANTHROPIC_API_KEY", "")
+GEMINI_API_KEY       = os.environ.get("GEMINI_API_KEY", "")
 RANK_CACHE_FILE     = "rank_cache.json"
 PITCHER_POS         = {"SP", "RP", "P"}
 INVALID_STAT        = {"", "-", None, "-/-", "—", "N/A", "0"}
@@ -398,46 +398,40 @@ def save_ranks(ranks):
 # ─────────────────────────────────────────────
 def generate_mvp_comment(mvp: dict, bottom: dict) -> str:
     """
-    呼叫 Claude API 產生今日 MVP 趣味點評
-    mvp:    近兩天得分最高的球員 dict
-    bottom: 近兩天得分最低的球員 dict
+    呼叫 Gemini API 產生近兩天 MVP 趣味點評
     """
-    if not ANTHROPIC_API_KEY:
+    if not GEMINI_API_KEY:
         return ""
 
-    mvp_name    = mvp["name"]
-    mvp_score   = mvp["score"]
-    mvp_pos     = mvp["position"]
-    mvp_team    = mvp["team"]
-    mvp_owner   = mvp.get("owner", "某位玩家")
-    bot_name    = bottom["name"]
-    bot_score   = bottom["score"]
-    bot_owner   = bottom.get("owner", "某位玩家")
+    mvp_name  = mvp["name"]
+    mvp_score = mvp["score"]
+    mvp_pos   = mvp["position"]
+    mvp_team  = mvp["team"]
+    mvp_owner = mvp.get("owner", "某位玩家")
+    bot_name  = bottom["name"]
+    bot_score = bottom["score"]
+    bot_owner = bottom.get("owner", "某位玩家")
 
-    prompt = f"""你是一個 Yahoo Fantasy MLB 聯盟的趣味播報員，用繁體中文寫一段簡短點評（60字以內）。
-
-近兩天表現最佳球員：{mvp_name}（{mvp_pos}，{mvp_team}），得{mvp_score:.1f}分，屬於玩家「{mvp_owner}」
-近兩天表現最差球員：{bot_name}，得{bot_score:.1f}分，屬於玩家「{bot_owner}」
-
-請寫一段幽默、帶點嘲諷但不失禮的點評，可以稱讚MVP也可以酸一下墊底球員的主人。語氣輕鬆像朋友聊天。直接給點評內容，不要加任何前綴。"""
+    prompt = (
+        f"你是一個 Yahoo Fantasy MLB 聯盟的趣味播報員，用繁體中文寫一段簡短點評（60字以內）。\n\n"
+        f"近兩天表現最佳球員：{mvp_name}（{mvp_pos}，{mvp_team}），得{mvp_score:.1f}分，屬於玩家「{mvp_owner}」\n"
+        f"近兩天表現最差球員：{bot_name}，得{bot_score:.1f}分，屬於玩家「{bot_owner}」\n\n"
+        f"請寫一段幽默、帶點嘲諷但不失禮的點評，可以稱讚MVP也可以酸一下墊底球員的主人。"
+        f"語氣輕鬆像朋友聊天。直接給點評內容，不要加任何前綴。"
+    )
 
     try:
+        url = (
+            f"https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+        )
         resp = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-sonnet-4-20250514",
-                "max_tokens": 200,
-                "messages": [{"role": "user", "content": prompt}],
-            },
+            url,
+            json={"contents": [{"parts": [{"text": prompt}]}]},
             timeout=30,
         )
         resp.raise_for_status()
-        comment = resp.json()["content"][0]["text"].strip()
+        comment = resp.json()["candidates"][0]["content"]["parts"][0]["text"].strip()
         print(f"  MVP 點評: {comment}")
         return comment
     except Exception as e:
@@ -603,13 +597,16 @@ def main():
         if comment:
             mvp = today_top10[0]
             loser = today_bottom5[0]
+            mvp_name  = mvp["name"]
+            mvp_owner = mvp["owner"]
+            mvp_score = mvp["score"]
+            bot_name  = loser["name"]
+            bot_owner = loser["owner"]
+            bot_score = loser["score"]
             msg = (
-                f"🏆 **近兩天 MVP：{mvp['name']}**（{mvp['owner']}）`{mvp['score']:+.1f}pts`
-"
-                f"💀 **近兩天墊底：{loser['name']}**（{loser['owner']}）`{loser['score']:+.1f}pts`
-
-"
-                f"🤖 {comment}"
+                f"\U0001f3c6 **近兩天 MVP：{mvp_name}**（{mvp_owner}）`{mvp_score:+.1f}pts`\n"
+                f"\U0001f480 **近兩天墊底：{bot_name}**（{bot_owner}）`{bot_score:+.1f}pts`\n\n"
+                f"\U0001f916 {comment}"
             )
             send_discord_text(msg)
 
