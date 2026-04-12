@@ -603,11 +603,10 @@ def main():
             bot_name  = loser["name"]
             bot_owner = loser["owner"]
             bot_score = loser["score"]
-            msg = (
-                f"\U0001f3c6 **近兩天 MVP：{mvp_name}**（{mvp_owner}）`{mvp_score:+.1f}pts`\n"
-                f"\U0001f480 **近兩天墊底：{bot_name}**（{bot_owner}）`{bot_score:+.1f}pts`\n\n"
-                f"\U0001f916 {comment}"
-            )
+            line1 = f"🏆 **近兩天 MVP：{mvp_name}**（{mvp_owner}）`{mvp_score:+.1f}pts`"
+            line2 = f"💀 **近兩天墊底：{bot_name}**（{bot_owner}）`{bot_score:+.1f}pts`"
+            line3 = f"🤖 {comment}"
+            msg = line1 + "\n" + line2 + "\n\n" + line3
             send_discord_text(msg)
 
     # 4. Free Agent TOP5（有資料才發）
