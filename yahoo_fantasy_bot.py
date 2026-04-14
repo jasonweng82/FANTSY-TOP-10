@@ -501,6 +501,8 @@ def main():
                     "owner":       owner_map.get(f"{name}|{p['team']}") or owner_map.get(name, "Free Agent"),
                     "score":       0.0,
                     "season_rank": season_rank_map.get(name, 0),
+                    "rank_change": (prev_ranks.get(name, 0) - season_rank_map.get(name, 0))
+                                   if prev_ranks.get(name, 0) > 0 else 0,
                 }
                 two_day_opps[name] = []
             two_day_scores[name]["score"] += p["score"]
@@ -519,9 +521,9 @@ def main():
     today_bottom5 = sorted(two_day_scores.values(), key=lambda x: x["score"])[:5]
     print(f"  近兩天有得分球員共 {len(played)} 位")
 
-    # ── 排名快取 ──
+    # ── 排名快取（全員）──
     prev_ranks = load_prev_ranks()
-    new_ranks  = {p["name"]: i + 1 for i, p in enumerate(season_top10)}
+    new_ranks  = {p["name"]: i + 1 for i, p in enumerate(all_players)}
 
     # ── 產生圖卡並發送 ──
     print("產生圖卡並推送到 Discord...")
