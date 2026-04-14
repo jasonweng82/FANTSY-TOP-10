@@ -437,6 +437,9 @@ def main():
     # 建立本季全員排名對照表 {name: rank}
     season_rank_map = {p["name"]: i+1 for i, p in enumerate(all_players)}
 
+    # 載入前一天排名快取（rank_change 計算用）
+    prev_ranks = load_prev_ranks()
+
     # ── 抓各隊 Roster Owner Map ──
     print("抓取各隊 roster 對應表...")
     owner_map = fetch_player_owner_map(token)
@@ -521,8 +524,7 @@ def main():
     today_bottom5 = sorted(two_day_scores.values(), key=lambda x: x["score"])[:5]
     print(f"  近兩天有得分球員共 {len(played)} 位")
 
-    # ── 排名快取（全員）──
-    prev_ranks = load_prev_ranks()
+    # ── 儲存今日排名快取（全員）──
     new_ranks  = {p["name"]: i + 1 for i, p in enumerate(all_players)}
 
     # ── 產生圖卡並發送 ──
