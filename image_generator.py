@@ -66,7 +66,7 @@ def _header(d, fonts, title, subtitle, last_col="TREND", show_last=True):
     for x, label in cols:
         d.text((x, 118), label, font=fonts["detail"], fill=DK_GRAY)
 
-def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col, score_col=WHITE):
+def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col, score_col=WHITE, season_rank=0):
     y  = Y_HEADER + (rank - 1) * ROW_H
     bg = BG_ROW1 if rank == 1 else BG_ROW2
     d.rounded_rectangle([18, y, W-18, y+ROW_H-6], radius=8, fill=bg)
@@ -84,15 +84,23 @@ def _row(d, fonts, rank, name, team, pos, owner, score, trend, tcol, bar_col, sc
 
     # Owner 標籤
     owner_str = (owner or "Free Agent")[:22]
-    # 畫 owner 小徽章
     bbox = d.textbbox((0, 0), owner_str, font=fonts["owner"])
     ow   = bbox[2] - bbox[0] + 14
     ox   = 78
     oy   = y + 66
-    owner_bg = BG_OWNER if owner_str != "Free Agent" else "#1d2d3d"
+    owner_bg  = BG_OWNER if owner_str != "Free Agent" else "#1d2d3d"
     owner_col = GREEN_LT if owner_str != "Free Agent" else NEW_BLUE
     d.rounded_rectangle([ox, oy, ox+ow, oy+22], radius=4, fill=owner_bg)
     d.text((ox+7, oy+3), owner_str, font=fonts["owner"], fill=owner_col)
+
+    # Season Rank 標籤（近兩天圖卡用）
+    if season_rank > 0:
+        rank_str = f"#{season_rank}"
+        rx = ox + ow + 8
+        bbox_r = d.textbbox((0, 0), rank_str, font=fonts["owner"])
+        rw = bbox_r[2] - bbox_r[0] + 14
+        d.rounded_rectangle([rx, oy, rx+rw, oy+22], radius=4, fill="#1d2535")
+        d.text((rx+7, oy+3), rank_str, font=fonts["owner"], fill=GRAY)
 
     # POS 徽章（動態寬度，最少 50px）
     ps   = (pos or "??")[:5]
@@ -155,7 +163,8 @@ def generate_today_top10(players, today_str) -> bytes:
     for i, p in enumerate(players, 1):
         sc = p["score"]
         _row(d, fonts, i, p["name"], p["team"], p["position"],
-             p.get("owner", ""), sc, "", GREEN, _bar(p["position"]))
+             p.get("owner", ""), sc, "", GREEN, _bar(p["position"]),
+             season_rank=p.get("season_rank", 0))
     _footer(d, fonts, len(players), "近兩天累積得分排行")
     return _to_bytes(img)
 
@@ -166,9 +175,9 @@ def generate_today_bottom5(players, today_str) -> bytes:
     _header(d, fonts, "近兩天得分 BOTTOM 5", f"{today_str}  ·  Yahoo Fantasy MLB", show_last=False)
     for i, p in enumerate(players, 1):
         sc = p["score"]
-        # trend 傳空字串 → 分數欄自動變紅色，不顯示 OPP
         _row(d, fonts, i, p["name"], p["team"], p["position"],
-             p.get("owner", ""), sc, "", RED, _bar(p["position"]))
+             p.get("owner", ""), sc, "", RED, _bar(p["position"]),
+             season_rank=p.get("season_rank", 0))
     _footer(d, fonts, len(players), "近兩天累積得分墊底")
     return _to_bytes(img)
 
