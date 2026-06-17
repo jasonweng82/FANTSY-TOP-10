@@ -132,7 +132,7 @@ def fetch_fa_players(token):
         if count < page_size:
             break
         start += page_size
-        time.sleep(0.3)
+        time.sleep(1.0)
     return all_raw
 
 
