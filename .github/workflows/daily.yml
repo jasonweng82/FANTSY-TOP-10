@@ -1,17 +1,15 @@
 name: Yahoo Fantasy MLB Daily Bot
-
 on:
   schedule:
-    # 每天台灣時間下午 15:00 (UTC 07:00)
-    - cron: "0 7 * * *"
-    # 每週一台灣時間下午 3:00 (UTC 07:00) — 週報
-    - cron: "0 7 * * 1"
+    # 每天台灣時間下午 15:00 (UTC 07:00)，週一跳過（週一由下面那條處理）
+    - cron: "0 7 * * 2-7"
+    # 每週一台灣時間下午 16:00 (UTC 08:00)，含週報
+    - cron: "0 8 * * 1"
   workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
