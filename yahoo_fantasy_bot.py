@@ -509,18 +509,17 @@ def main():
         send_discord_image(img, "free_agent_top5.png")
 
     # 5. 週報（週一才發）── 過去七天得分 TOP10，非整季累積
-    if is_monday:
+        if is_monday:
         print("今天是週一，抓取過去七天成績產生週報...")
-        weekly_top10 = fetch_weekly_top10(token, today, owner_map)
-
+        weekly_top10 = fetch_weekly_top10(token, today, owner_map)  # ← 這行是關鍵
+ 
         last_mon   = today - timedelta(days=7)
         last_sun   = today - timedelta(days=1)
         week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
-
-        # generate_weekly_report 現在接收的是「過去七天加總」的 top10
-        # 若原本簽名是 (season_top10, week_label)，請同步更新 image_generator.py
-        img = generate_weekly_report(weekly_top10, week_label)
+ 
+        img = generate_weekly_report(weekly_top10, week_label)      # ← 傳 weekly_top10
         send_discord_image(img, "weekly_report.png")
+
 
     # ── 儲存排名快取 ──
     new_ranks = {p["name"]: i + 1 for i, p in enumerate(all_players)}
