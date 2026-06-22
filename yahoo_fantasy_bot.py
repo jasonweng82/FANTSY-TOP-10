@@ -146,15 +146,16 @@ def fetch_all_players_date(token, date_str):
 
 def fetch_rostered_players_date(token, date_str):
     """
-    抓取指定日期所有 rostered（status=T）球員的當日成績。
-    週報專用：status=T + type=date 才能抓到歷史日期的成績。
+    抓取指定日期有出賽球員的成績。
+    status=P（played）+ type=date 是 Yahoo API 抓歷史日期成績唯一穩定的組合。
+    status=T 是「目前在名單上」的快照，對歷史日期無效。
     """
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     all_raw = []
     start = 0
     page_size = 25
     while True:
-        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
+        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=P"
                f";start={start};count={page_size}"
                f"/stats;type=date;date={date_str}?format=json")
         data = yahoo_get(url, token)
