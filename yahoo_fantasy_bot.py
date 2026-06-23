@@ -3,12 +3,6 @@ Yahoo Fantasy MLB Bot
 - 每天抓取本季累積得分前10名球員 + 近兩天得分 + Free Agent
 - 每週一推送週報（台灣時間上週二到本週一，共七天累積 TOP10）
 - 產生圖卡發送到 Discord
-
-[優化說明]
-1. fetch_player_owner_map：單次請求 ;out=roster，原本 12+ 次 → 1 次
-2. 近兩天 FA 合併：date 抓全員時同步判斷 FA，省去重複抓取
-3. sleep 調降：0.5s/1.0s → 0.2s
-4. 週報：抓上週二到本週一共七天逐日成績加總（含今天，用 status=T type=date）
 """
 
 import os
@@ -76,19 +70,23 @@ def yahoo_get(url, token):
     resp.raise_for_status()
     return resp.json()
 
-def fetch_all_players(token, stats_type, date_str=None):
-    """抓取聯盟內所有 rostered 球員，支援 season / date 兩種模式"""
+def _fetch_players_by_status(token, status, stats_type, date_str=None, label=""):
+    """
+    通用分頁抓取。
+    status: T（rostered）/ FA（free agent）/ P（played，週報歷史用）
+    stats_type: season / date
+    """
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     all_raw = []
     start = 0
     page_size = 25
     while True:
         if stats_type == "season":
-            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
+            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status={status}"
                    f";start={start};count={page_size}"
                    f"/stats;type=season?format=json")
         else:
-            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
+            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status={status}"
                    f";start={start};count={page_size}"
                    f"/stats;type=date;date={date_str}?format=json")
         data = yahoo_get(url, token)
@@ -103,79 +101,30 @@ def fetch_all_players(token, stats_type, date_str=None):
             entry = player_list.get(str(i))
             if entry:
                 all_raw.append(entry)
-        print(f"  已抓取 {start + count} 位球員...")
         if count < page_size:
             break
         start += page_size
         time.sleep(0.2)
+    tag = f"[{label}] " if label else ""
+    print(f"  {tag}{date_str or 'season'} status={status} 抓取完畢，共 {len(all_raw)} 位")
     return all_raw
 
 
-def fetch_all_players_date(token, date_str):
-    """
-    抓取指定日期所有 active（rostered + FA）球員的當日成績。
-    用 status=A 一次抓完，近兩天統計使用。
-    """
-    base = "https://fantasysports.yahooapis.com/fantasy/v2"
-    all_raw = []
-    start = 0
-    page_size = 25
-    while True:
-        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=A"
-               f";start={start};count={page_size}"
-               f"/stats;type=date;date={date_str}?format=json")
-        data = yahoo_get(url, token)
-        try:
-            player_list = data["fantasy_content"]["league"][1]["players"]
-            count = player_list.get("count", 0)
-        except Exception:
-            break
-        if count == 0:
-            break
-        for i in range(count):
-            entry = player_list.get(str(i))
-            if entry:
-                all_raw.append(entry)
-        if count < page_size:
-            break
-        start += page_size
-        time.sleep(0.2)
-    print(f"  {date_str} 抓取完畢，共 {len(all_raw)} 位")
-    return all_raw
+def fetch_all_players(token, stats_type, date_str=None):
+    """本季累積：只需要 rostered 球員"""
+    return _fetch_players_by_status(token, "T", stats_type, date_str)
 
+def fetch_rostered_date(token, date_str):
+    """近兩天 rostered 球員當日成績"""
+    return _fetch_players_by_status(token, "T", "date", date_str, label="rostered")
 
-def fetch_rostered_players_date(token, date_str):
-    """
-    抓取指定日期有出賽球員的成績。
-    status=P（played）+ type=date 是 Yahoo API 抓歷史日期成績唯一穩定的組合。
-    status=T 是「目前在名單上」的快照，對歷史日期無效。
-    """
-    base = "https://fantasysports.yahooapis.com/fantasy/v2"
-    all_raw = []
-    start = 0
-    page_size = 25
-    while True:
-        url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=P"
-               f";start={start};count={page_size}"
-               f"/stats;type=date;date={date_str}?format=json")
-        data = yahoo_get(url, token)
-        try:
-            player_list = data["fantasy_content"]["league"][1]["players"]
-            count = player_list.get("count", 0)
-        except Exception:
-            break
-        if count == 0:
-            break
-        for i in range(count):
-            entry = player_list.get(str(i))
-            if entry:
-                all_raw.append(entry)
-        if count < page_size:
-            break
-        start += page_size
-        time.sleep(0.2)
-    print(f"  [週報] {date_str} 抓取完畢，共 {len(all_raw)} 位")
-    return all_raw
+def fetch_fa_date(token, date_str):
+    """近兩天 FA 球員當日成績"""
+    return _fetch_players_by_status(token, "FA", "date", date_str, label="FA")
+
+def fetch_weekly_date(token, date_str):
+    """週報歷史日期成績：用 status=T，rostered 球員的歷史單日成績"""
+    return _fetch_players_by_status(token, "T", "date", date_str, label="週報")
 
 
 def fetch_schedule(date_str) -> dict:
@@ -198,7 +147,7 @@ def fetch_schedule(date_str) -> dict:
 
 
 def fetch_player_owner_map(token) -> dict:
-    """單次請求取得全聯盟所有隊伍 + roster（原本 12+ 次 → 1 次）"""
+    """單次請求取得全聯盟所有隊伍 + roster"""
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     owner_map = {}
     url = f"{base}/league/{YAHOO_LEAGUE_ID}/teams;out=roster?format=json"
@@ -334,29 +283,20 @@ def send_discord_image(image_bytes, filename="card.png", content=""):
 # 週報：上週二到本週一（含今天）七天逐日加總
 # ─────────────────────────────────────────────
 def fetch_weekly_top10(token, today, owner_map) -> list:
-    """
-    抓取上週二到本週一（含今天，共七天）每天的 rostered 球員成績加總。
-    使用 status=T + type=date，這是 Yahoo API 歷史日期唯一穩定有資料的組合。
-    回傳 TOP10 list。
-    """
     weekly_scores = {}
 
-    # delta=0 是今天（週一），delta=6 是上週二，共七天
-    for delta in range(0, 7):
+    for delta in range(0, 7):  # delta=0 本週一, delta=6 上週二
         day     = today - timedelta(days=delta)
         day_str = day.strftime("%Y-%m-%d")
         print(f"  [週報] 抓取 {day_str}...")
 
-        raw         = fetch_rostered_players_date(token, day_str)
+        raw         = fetch_weekly_date(token, day_str)
         players_day = parse_players(raw)
 
         day_count = 0
         for p in players_day:
-            # 有任何非零 stat 就算有上場
-            has_played = False
-            if p["score"] != 0:
-                has_played = True
-            else:
+            has_played = p["score"] != 0
+            if not has_played:
                 for v in p["stats"].values():
                     if v not in INVALID_STAT:
                         try:
@@ -384,7 +324,7 @@ def fetch_weekly_top10(token, today, owner_map) -> list:
             weekly_scores[name]["days_played"] += 1
             day_count += 1
 
-        print(f"  [週報] {day_str} 有得分球員 {day_count} 位")
+        print(f"  [週報] {day_str} 有上場球員 {day_count} 位")
 
     result = sorted(weekly_scores.values(), key=lambda x: x["score"], reverse=True)
     print(f"  [週報] 七天加總，共 {len(result)} 位有得分球員")
@@ -410,7 +350,7 @@ def main():
     token = refresh_access_token()
     print("取得 Token 成功")
 
-    # ── 本季累積 ──
+    # ── 本季累積（只要 rostered）──
     print("抓取本季累積數據...")
     season_raw  = fetch_all_players(token, "season")
     all_players = parse_players(season_raw)
@@ -423,15 +363,14 @@ def main():
     season_rank_map = {p["name"]: i + 1 for i, p in enumerate(all_players)}
     prev_ranks      = load_prev_ranks()
 
-    # ── 單次請求取得 Owner Map ──
-    print("抓取各隊 roster 對應表（單次請求）...")
+    # ── Owner Map（單次請求）──
+    print("抓取各隊 roster 對應表...")
     owner_map = fetch_player_owner_map(token)
-
     for p in all_players:
         key = f"{p['name']}|{p['team']}"
         p["owner"] = owner_map.get(key) or owner_map.get(p["name"], "Free Agent")
 
-    # ── 近兩天數據（rostered + FA 合併，只抓兩輪）──
+ # ── 近兩天：rostered 和 FA 分開抓，合併排名 ──
     print("抓取近兩天數據...")
     two_day_scores = {}
     two_day_opps   = {}
@@ -441,16 +380,13 @@ def main():
         day      = today - timedelta(days=delta)
         day_str  = day.strftime("%Y-%m-%d")
         schedule = fetch_schedule(day_str)
-        raw      = fetch_all_players_date(token, day_str)
-        players_day = parse_players(raw)
 
-        for p in players_day:
+        # Rostered 球員
+        for p in parse_players(fetch_rostered_date(token, day_str)):
             if p["score"] == 0:
                 continue
             name  = p["name"]
-            key   = f"{name}|{p['team']}"
-            owner = owner_map.get(key) or owner_map.get(name, "Free Agent")
-
+            owner = owner_map.get(f"{name}|{p['team']}") or owner_map.get(name, "Free Agent")
             if name not in two_day_scores:
                 two_day_scores[name] = {
                     "name":        name,
@@ -465,22 +401,45 @@ def main():
                 }
                 two_day_opps[name] = []
             two_day_scores[name]["score"] += p["score"]
-
             opp = schedule.get(p["team"], "")
             if opp and opp not in two_day_opps[name]:
                 two_day_opps[name].append(opp)
 
-            if owner == "Free Agent":
-                if name not in fa_scores:
-                    fa_scores[name] = {
-                        "name":       name,
-                        "team":       p["team"],
-                        "position":   p["position"],
-                        "is_pitcher": p["is_pitcher"],
-                        "owner":      "Free Agent",
-                        "score":      0.0,
-                    }
-                fa_scores[name]["score"] += p["score"]
+        # FA 球員（分開抓，同時加進 two_day_scores 和 fa_scores）
+        for p in parse_players(fetch_fa_date(token, day_str)):
+            if p["score"] == 0:
+                continue
+            name = p["name"]
+
+            # 加進整體排行（含 FA）
+            if name not in two_day_scores:
+                two_day_scores[name] = {
+                    "name":        name,
+                    "team":        p["team"],
+                    "position":    p["position"],
+                    "is_pitcher":  p["is_pitcher"],
+                    "owner":       "Free Agent",
+                    "score":       0.0,
+                    "season_rank": season_rank_map.get(name, 0),
+                    "rank_change": 0,
+                }
+                two_day_opps[name] = []
+            two_day_scores[name]["score"] += p["score"]
+            opp = schedule.get(p["team"], "")
+            if opp and opp not in two_day_opps[name]:
+                two_day_opps[name].append(opp)
+
+            # 同時保留 FA 專屬榜
+            if name not in fa_scores:
+                fa_scores[name] = {
+                    "name":       name,
+                    "team":       p["team"],
+                    "position":   p["position"],
+                    "is_pitcher": p["is_pitcher"],
+                    "owner":      "Free Agent",
+                    "score":      0.0,
+                }
+            fa_scores[name]["score"] += p["score"]
 
         print(f"  {day_str} 抓取完畢")
 
@@ -488,14 +447,17 @@ def main():
         opps = two_day_opps.get(name, [])
         p["opponent"] = "  ·  ".join(opps) if opps else ""
 
+    # rostered + FA 全部合併排序
     played        = sorted(two_day_scores.values(), key=lambda x: x["score"], reverse=True)
     today_top10   = played[:10]
     today_bottom5 = sorted(two_day_scores.values(), key=lambda x: x["score"])[:5]
     fa_list       = sorted(fa_scores.values(), key=lambda x: x["score"], reverse=True)
     fa_top5       = fa_list[:5]
 
-    print(f"  近兩天有得分球員共 {len(played)} 位")
+    print(f"  近兩天有得分球員共 {len(played)} 位（含 FA）")
     print(f"  近兩天有得分 FA={len(fa_list)}")
+    for p in fa_top5:
+        print(f"    FA: {p['name']:<22} {p['score']:.1f}")
 
     # ── 產生圖卡並發送 ──
     print("產生圖卡並推送到 Discord...")
@@ -516,14 +478,11 @@ def main():
         send_discord_image(img, "free_agent_top5.png")
 
     # ── 週報（週一才發）──
-    # 範圍：上週二到本週一（含今天），共七天
     if is_monday:
         print("今天是週一，抓取過去七天成績產生週報...")
         weekly_top10 = fetch_weekly_top10(token, today, owner_map)
-
-        last_tue   = today - timedelta(days=6)   # 上週二
+        last_tue   = today - timedelta(days=6)
         week_label = f"{last_tue.strftime('%m/%d')} – {today.strftime('%m/%d')}"
-
         if weekly_top10:
             img = generate_weekly_report(weekly_top10, week_label)
             send_discord_image(img, "weekly_report.png")
