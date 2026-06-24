@@ -70,37 +70,49 @@ def yahoo_get(url, token):
     resp.raise_for_status()
     return resp.json()
 
-def fetch_all_players(token, stats_type, date_str=None):
+def fetch_roster_players_date(token, date_str):
+    """
+    改從各隊 roster 直接抓當日成績，確保只包含 owned 球員
+    """
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     all_raw = []
-    start = 0
-    page_size = 25
-    while True:
-        if stats_type == "season":
-            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
-                   f";start={start};count={page_size}"
-                   f"/stats;type=season?format=json")
-        else:
-            url = (f"{base}/league/{YAHOO_LEAGUE_ID}/players;status=T"
-                   f";start={start};count={page_size}"
-                   f"/stats;type=date;date={date_str}?format=json")
-        data = yahoo_get(url, token)
+
+    teams_url = f"{base}/league/{YAHOO_LEAGUE_ID}/teams?format=json"
+    data = yahoo_get(teams_url, token)
+    try:
+        teams_raw = data["fantasy_content"]["league"][1]["teams"]
+        team_count = teams_raw["count"]
+    except Exception as e:
+        print(f"[WARN] 無法取得隊伍列表: {e}")
+        return all_raw
+
+    for i in range(team_count):
         try:
-            player_list = data["fantasy_content"]["league"][1]["players"]
-            count = player_list.get("count", 0)
-        except Exception:
-            break
-        if count == 0:
-            break
-        for i in range(count):
-            entry = player_list.get(str(i))
-            if entry:
-                all_raw.append(entry)
-        print(f"  已抓取 {start + count} 位球員...")
-        if count < page_size:
-            break
-        start += page_size
-        time.sleep(0.5)
+            team_data = teams_raw[str(i)]["team"]
+            team_info = team_data[0]
+            team_key = ""
+            for item in team_info:
+                if isinstance(item, dict) and "team_key" in item:
+                    team_key = item["team_key"]
+                    break
+            if not team_key:
+                continue
+
+            # 抓該隊當日成績
+            url = (f"{base}/team/{team_key}/players"
+                   f"/stats;type=date;date={date_str}?format=json")
+            rdata = yahoo_get(url, token)
+            players_raw = rdata["fantasy_content"]["team"][1]["players"]
+            p_count = players_raw.get("count", 0)
+            for j in range(p_count):
+                entry = players_raw.get(str(j))
+                if entry:
+                    all_raw.append(entry)
+            time.sleep(0.3)
+        except Exception as e:
+            print(f"[WARN] 隊伍 {i} 當日成績抓取失敗: {e}")
+
+    print(f"  {date_str} roster 球員共 {len(all_raw)} 位")
     return all_raw
 
 def fetch_fa_players(token):
@@ -489,7 +501,7 @@ def main():
     for day in [today - timedelta(days=1), today - timedelta(days=2)]:
         day_str  = day.strftime("%Y-%m-%d")
         schedule = fetch_schedule(day_str)   # {team: "vs OPP"}
-        raw = fetch_all_players(token, "date", day_str)
+        raw = fetch_all_players(token, day_str)
         players_day = parse_players(raw)
         for p in players_day:
             if p["score"] == 0:
