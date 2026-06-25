@@ -108,7 +108,7 @@ def fetch_roster_players_date(token, date_str):
                 entry = players_raw.get(str(j))
                 if entry:
                     all_raw.append(entry)
-            time.sleep(0.3)
+            time.sleep(0.5)
         except Exception as e:
             print(f"[WARN] 隊伍 {i} 當日成績抓取失敗: {e}")
 
