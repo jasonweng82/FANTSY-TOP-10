@@ -501,7 +501,7 @@ def main():
     for day in [today - timedelta(days=1), today - timedelta(days=2)]:
         day_str  = day.strftime("%Y-%m-%d")
         schedule = fetch_schedule(day_str)   # {team: "vs OPP"}
-        raw = fetch_all_players(token, day_str)
+        raw = fetch_roster_players_date(token, day_str)
         players_day = parse_players(raw)
         for p in players_day:
             if p["score"] == 0:
