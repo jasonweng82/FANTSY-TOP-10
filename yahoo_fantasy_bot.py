@@ -544,44 +544,42 @@ def main():
         send_discord_image(img, "free_agent_top5.png")
 
     if is_monday:
-    print("今天是週一，產生週報...")
-    last_mon = today - timedelta(days=7)
-    last_sun = today - timedelta(days=1)
-    week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
+        print("今天是週一，產生週報...")
+        last_mon = today - timedelta(days=7)
+        last_sun = today - timedelta(days=1)
+        week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
 
-    # 抓上週每天的 roster 球員數據並合計
-    print("抓取上週數據...")
-    weekly_scores = {}
+        print("抓取上週數據...")
+        weekly_scores = {}
 
-    for i in range(7):
-        day = last_mon + timedelta(days=i)
-        day_str = day.strftime("%Y-%m-%d")
-        raw = fetch_roster_players_date(token, day_str)
-        players_day = parse_players(raw)
-        for p in players_day:
-            if p["score"] == 0:
-                continue
-            name = p["name"]
-            if name not in weekly_scores:
-                weekly_scores[name] = {
-                    "name":       name,
-                    "team":       p["team"],
-                    "position":   p["position"],
-                    "is_pitcher": p["is_pitcher"],
-                    "owner":      owner_map.get(f"{name}|{p['team']}") or owner_map.get(name, "Free Agent"),
-                    "score":      0.0,
-                }
-            weekly_scores[name]["score"] += p["score"]
-        print(f"  {day_str} 抓取完畢")
+        for i in range(7):
+            day = last_mon + timedelta(days=i)
+            day_str = day.strftime("%Y-%m-%d")
+            raw = fetch_roster_players_date(token, day_str)
+            players_day = parse_players(raw)
+            for p in players_day:
+                if p["score"] == 0:
+                    continue
+                name = p["name"]          # ← 這行要在 for p 裡面
+                if name not in weekly_scores:   # ← 這行也是
+                    weekly_scores[name] = {
+                        "name":       name,
+                        "team":       p["team"],
+                        "position":   p["position"],
+                        "is_pitcher": p["is_pitcher"],
+                        "owner":      owner_map.get(f"{name}|{p['team']}") or owner_map.get(name, "Free Agent"),
+                        "score":      0.0,
+                    }
+                weekly_scores[name]["score"] += p["score"]
+            print(f"  {day_str} 抓取完畢")
 
-    weekly_top10 = sorted(weekly_scores.values(), key=lambda x: x["score"], reverse=True)[:10]
-    print(f"  上週有得分球員共 {len(weekly_scores)} 位")
-    for i, p in enumerate(weekly_top10, 1):
-        print(f"  {i:>2}. {p['name']:<22} {p['score']:>7.1f}")
+        weekly_top10 = sorted(weekly_scores.values(), key=lambda x: x["score"], reverse=True)[:10]  # ← 縮進來
+        print(f"  上週有得分球員共 {len(weekly_scores)} 位")
+        for i, p in enumerate(weekly_top10, 1):
+            print(f"  {i:>2}. {p['name']:<22} {p['score']:>7.1f}")
 
-    img = generate_weekly_report(weekly_top10, week_label)
-    send_discord_image(img, "weekly_report.png")
-
+        img = generate_weekly_report(weekly_top10, week_label)
+        send_discord_image(img, "weekly_report.png")
 
 if __name__ == "__main__":
     main()
