@@ -545,8 +545,8 @@ def main():
 
     if is_monday:
         print("今天是週一，產生週報...")
-        last_mon = today - timedelta(days=7)
-        last_sun = today - timedelta(days=1)
+        last_mon = today - timedelta(days=6)
+        last_sun = today
         week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
 
         print("抓取上週數據...")
