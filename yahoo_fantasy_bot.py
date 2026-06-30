@@ -3,6 +3,7 @@ Yahoo Fantasy MLB Bot
 - 每天抓取本季累積得分前10名球員 + 今日得分 + Free Agent
 - 每週一推送週報
 - 產生圖卡發送到 Discord
+- 休賽季自動停止，新賽季自動開始
 """
 
 import os
@@ -71,6 +72,23 @@ def yahoo_get(url, token):
     return resp.json()
 
 # ─────────────────────────────────────────────
+# 休賽季判斷
+# ─────────────────────────────────────────────
+def is_mlb_season_active() -> bool:
+    """檢查今天是否在 MLB 賽季中（有賽程就代表賽季進行中）"""
+    today_str = date.today().strftime("%Y-%m-%d")
+    url = f"https://statsapi.mlb.com/api/v1/schedule?sportId=1&date={today_str}"
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        total_games = data.get("totalGames", 0)
+        return total_games > 0
+    except Exception as e:
+        print(f"[WARN] 無法確認賽季狀態: {e}")
+        return True  # 無法確認時預設繼續執行
+
+# ─────────────────────────────────────────────
 # 本季累積數據（分頁，status=T 抓已被選走的球員）
 # ─────────────────────────────────────────────
 def fetch_all_players(token, stats_type, date_str=None):
@@ -110,9 +128,7 @@ def fetch_all_players(token, stats_type, date_str=None):
 # 近兩天數據：從各隊 roster 抓，確保只含 owned 球員
 # ─────────────────────────────────────────────
 def fetch_roster_players_date(token, date_str):
-    """
-    從各隊 roster 直接抓當日成績，確保只包含 owned 球員，不混入 FA
-    """
+    """從各隊 roster 直接抓當日成績，確保只包含 owned 球員，不混入 FA"""
     base = "https://fantasysports.yahooapis.com/fantasy/v2"
     all_raw = []
 
@@ -430,6 +446,11 @@ def main():
     is_monday = today.weekday() == 0
     print(f"[{today_str}] 開始執行 Yahoo Fantasy MLB Bot... (週一={is_monday})")
 
+    # ── 休賽季判斷 ──
+    if not is_mlb_season_active():
+        print("今天沒有 MLB 賽程，休賽季中，跳過執行。")
+        return
+
     token = refresh_access_token()
     print("取得 Token 成功")
 
@@ -489,7 +510,7 @@ def main():
     for day in [yesterday, day_before]:
         day_str  = day.strftime("%Y-%m-%d")
         schedule = fetch_schedule(day_str)
-        raw = fetch_roster_players_date(token, day_str)   # ← 只抓 roster 球員
+        raw = fetch_roster_players_date(token, day_str)
         players_day = parse_players(raw)
         for p in players_day:
             if p["score"] == 0:
@@ -543,25 +564,26 @@ def main():
         img = generate_free_agent_top5(fa_top5, today_str)
         send_discord_image(img, "free_agent_top5.png")
 
+    # ── 週報（只有週一發）──
     if is_monday:
         print("今天是週一，產生週報...")
-        last_mon = today - timedelta(days=6)
-        last_sun = today
-        week_label = f"{last_mon.strftime('%m/%d')} – {last_sun.strftime('%m/%d')}"
+        week_start = today - timedelta(days=6)  # 上週一
+        week_end   = today                       # 今天（上週日）
+        week_label = f"{week_start.strftime('%m/%d')} – {week_end.strftime('%m/%d')}"
 
         print("抓取上週數據...")
         weekly_scores = {}
 
         for i in range(7):
-            day = last_mon + timedelta(days=i)
+            day = week_start + timedelta(days=i)
             day_str = day.strftime("%Y-%m-%d")
             raw = fetch_roster_players_date(token, day_str)
             players_day = parse_players(raw)
             for p in players_day:
                 if p["score"] == 0:
                     continue
-                name = p["name"]          # ← 這行要在 for p 裡面
-                if name not in weekly_scores:   # ← 這行也是
+                name = p["name"]
+                if name not in weekly_scores:
                     weekly_scores[name] = {
                         "name":       name,
                         "team":       p["team"],
@@ -573,13 +595,17 @@ def main():
                 weekly_scores[name]["score"] += p["score"]
             print(f"  {day_str} 抓取完畢")
 
-        weekly_top10 = sorted(weekly_scores.values(), key=lambda x: x["score"], reverse=True)[:10]  # ← 縮進來
+        weekly_top10 = sorted(weekly_scores.values(), key=lambda x: x["score"], reverse=True)[:10]
         print(f"  上週有得分球員共 {len(weekly_scores)} 位")
         for i, p in enumerate(weekly_top10, 1):
             print(f"  {i:>2}. {p['name']:<22} {p['score']:>7.1f}")
 
         img = generate_weekly_report(weekly_top10, week_label)
         send_discord_image(img, "weekly_report.png")
+
+    save_ranks(new_ranks)
+    print("完成！")
+
 
 if __name__ == "__main__":
     main()
