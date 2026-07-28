@@ -1,0 +1,34 @@
+name: Get Yahoo Token
+on:
+  workflow_dispatch:  # 手動觸發
+
+jobs:
+  get-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get new refresh token
+        env:
+          YAHOO_CLIENT_ID: ${{ secrets.YAHOO_CLIENT_ID }}
+          YAHOO_CLIENT_SECRET: ${{ secrets.YAHOO_CLIENT_SECRET }}
+          YAHOO_REFRESH_TOKEN: ${{ secrets.YAHOO_REFRESH_TOKEN }}
+        run: |
+          python3 - <<'EOF'
+          import requests
+          import os
+
+          CLIENT_ID     = os.environ["YAHOO_CLIENT_ID"]
+          CLIENT_SECRET = os.environ["YAHOO_CLIENT_SECRET"]
+          REFRESH_TOKEN = os.environ["YAHOO_REFRESH_TOKEN"]
+
+          resp = requests.post(
+              "https://api.login.yahoo.com/oauth2/get_token",
+              data={"grant_type": "refresh_token", "refresh_token": REFRESH_TOKEN},
+              auth=(CLIENT_ID, CLIENT_SECRET),
+              headers={"Content-Type": "application/x-www-form-urlencoded"},
+          )
+          print(f"Status: {resp.status_code}")
+          print(f"Response: {resp.text}")
+          if resp.status_code == 200:
+              data = resp.json()
+              print(f"\n新的 Refresh Token:\n{data.get('refresh_token', '沒有回傳新token')}")
+          EOF
