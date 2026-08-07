@@ -1,15 +1,21 @@
 name: Yahoo Fantasy MLB Daily Bot
+
 on:
-  schedule:
-    # 每天台灣時間下午 15:00 (UTC 07:00)，週一除外
-    - cron: "0 7 * * 2,3,4,5,6,0"
-    # 每週一台灣時間下午 16:00 (UTC 08:00)，含週報
-    - cron: "0 8 * * 1"
+  # 暫停自動排程
+  # schedule:
+  #   # 每天台灣時間下午 15:00 (UTC 07:00)，週一除外
+  #   - cron: "0 7 * * 2,3,4,5,6,0"
+  #
+  #   # 每週一台灣時間下午 16:00 (UTC 08:00)，含週報
+  #   - cron: "0 8 * * 1"
+
+  # 保留手動執行
   workflow_dispatch:
 
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -34,11 +40,11 @@ jobs:
 
       - name: Run Fantasy Bot
         env:
-          YAHOO_CLIENT_ID:      ${{ secrets.YAHOO_CLIENT_ID }}
-          YAHOO_CLIENT_SECRET:  ${{ secrets.YAHOO_CLIENT_SECRET }}
-          YAHOO_REFRESH_TOKEN:  ${{ secrets.YAHOO_REFRESH_TOKEN }}
-          YAHOO_LEAGUE_ID:      ${{ secrets.YAHOO_LEAGUE_ID }}
-          DISCORD_WEBHOOK_URL:  ${{ secrets.DISCORD_WEBHOOK_URL }}
+          YAHOO_CLIENT_ID: ${{ secrets.YAHOO_CLIENT_ID }}
+          YAHOO_CLIENT_SECRET: ${{ secrets.YAHOO_CLIENT_SECRET }}
+          YAHOO_REFRESH_TOKEN: ${{ secrets.YAHOO_REFRESH_TOKEN }}
+          YAHOO_LEAGUE_ID: ${{ secrets.YAHOO_LEAGUE_ID }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: python yahoo_fantasy_bot.py
 
       - name: Save rank cache
